@@ -3,6 +3,7 @@ import QuotaPeekCore
 
 struct UsagePopover: View {
     @ObservedObject var state: AppState
+    @State private var refreshRotation = 0.0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,16 +39,14 @@ struct UsagePopover: View {
             Spacer()
 
             Button {
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    refreshRotation += 360
+                }
                 state.refresh()
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .rotationEffect(state.isRefreshing ? .degrees(360) : .zero)
-                    .animation(
-                        state.isRefreshing
-                            ? .linear(duration: 0.8).repeatForever(autoreverses: false)
-                            : .default,
-                        value: state.isRefreshing
-                    )
+                    .frame(width: 18, height: 18)
+                    .rotationEffect(.degrees(refreshRotation))
             }
             .buttonStyle(.plain)
             .help("Refresh usage")
