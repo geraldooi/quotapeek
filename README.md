@@ -32,6 +32,9 @@ make app
 open dist/QuotaPeek.app
 ```
 
+`make app` creates a universal Apple Silicon and Intel app bundle. Local builds
+use an ad-hoc signature and are intended for development on your own Mac.
+
 To install the local build:
 
 ```sh
@@ -42,7 +45,10 @@ This copies the app to `~/Applications`, so administrator access is not needed.
 
 ## Homebrew distribution
 
-The app is packaged as a normal `.app` bundle and includes a Homebrew cask template. After publishing a tagged zip release and replacing the template values, users can install it with:
+Stable releases are signed, notarized, and published through GitHub Actions.
+The release workflow updates the cask in
+[`geraldooi/homebrew-tap`](https://github.com/geraldooi/homebrew-tap), after
+which users can install with:
 
 ```sh
 brew install --cask geraldooi/tap/quotapeek
@@ -53,8 +59,11 @@ See [packaging/README.md](packaging/README.md) for the release steps.
 ## Development
 
 ```sh
-swift test
-swift build
+make test
+make verify
 ```
 
 The project is a dependency-free Swift Package with separate core parsing logic and SwiftUI presentation.
+
+Changes are developed on branches and merged into `main` through pull requests.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development and release flow.

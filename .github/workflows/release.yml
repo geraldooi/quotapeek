@@ -1,0 +1,207 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version from the VERSION file, without the v prefix
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Sign, notarize, and publish
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 30
+    environment: production
+    outputs:
+      version: ${{ steps.validate-version.outputs.version }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Validate version
+        id: validate-version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          test "$REQUESTED_VERSION" = "$(tr -d '[:space:]' < VERSION)"
+          printf '%s\n' "$REQUESTED_VERSION" |
+            grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' ||
+            { echo "Version must use semantic versioning, for example 0.1.0" >&2; exit 1; }
+          echo "VERSION=$REQUESTED_VERSION" >> "$GITHUB_ENV"
+          echo "version=$REQUESTED_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check for an existing release
+        id: existing-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate release credentials
+        if: steps.existing-release.outputs.exists != 'true'
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          set -eu
+          : "${MACOS_CERTIFICATE_P12:?Missing MACOS_CERTIFICATE_P12 secret}"
+          : "${MACOS_CERTIFICATE_PASSWORD:?Missing MACOS_CERTIFICATE_PASSWORD secret}"
+          : "${APPLE_API_KEY_P8:?Missing APPLE_API_KEY_P8 secret}"
+          : "${APPLE_API_KEY_ID:?Missing APPLE_API_KEY_ID secret}"
+          : "${APPLE_API_ISSUER_ID:?Missing APPLE_API_ISSUER_ID secret}"
+
+      - name: Import Developer ID certificate
+        if: steps.existing-release.outputs.exists != 'true'
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -eu
+          CERTIFICATE_PATH="$RUNNER_TEMP/developer-id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/quotapeek-signing.keychain-db"
+          printf '%s' "$MACOS_CERTIFICATE_P12" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+          SIGNING_IDENTITY="$(
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" |
+              sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' |
+              head -n 1
+          )"
+          test -n "$SIGNING_IDENTITY"
+          echo "SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Test and build signed universal app
+        if: steps.existing-release.outputs.exists != 'true'
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          make test
+          make app
+          ./scripts/verify-app.sh
+          codesign -dv --verbose=4 dist/QuotaPeek.app
+
+      - name: Notarize and staple
+        if: steps.existing-release.outputs.exists != 'true'
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          set -eu
+          API_KEY_PATH="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
+          printf '%s' "$APPLE_API_KEY_P8" | base64 --decode > "$API_KEY_PATH"
+          ./scripts/create-release-archive.sh
+          xcrun notarytool submit "dist/QuotaPeek-$VERSION.zip" \
+            --key "$API_KEY_PATH" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --wait
+          xcrun stapler staple dist/QuotaPeek.app
+          xcrun stapler validate dist/QuotaPeek.app
+          spctl --assess --type execute --verbose=2 dist/QuotaPeek.app
+          ./scripts/create-release-archive.sh
+
+      - name: Publish GitHub release
+        if: steps.existing-release.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh release create "v$VERSION" "dist/QuotaPeek-$VERSION.zip" \
+            --target "$GITHUB_SHA" \
+            --title "QuotaPeek $VERSION" \
+            --generate-notes
+
+      - name: Confirm release is available
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "v$VERSION"
+
+  homebrew:
+    name: Publish Homebrew cask
+    needs: release
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Check out Homebrew tap
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          repository: geraldooi/homebrew-tap
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          path: homebrew-tap
+
+      - name: Download release archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist
+          gh release download "v$VERSION" \
+            --pattern "QuotaPeek-$VERSION.zip" \
+            --dir dist
+
+      - name: Publish Homebrew cask
+        run: |
+          set -eu
+          SHA256="$(shasum -a 256 "dist/QuotaPeek-$VERSION.zip" | awk '{print $1}')"
+          mkdir -p homebrew-tap/Casks
+          sed \
+            -e "s/__VERSION__/$VERSION/g" \
+            -e "s/__SHA256__/$SHA256/g" \
+            packaging/Casks/quotapeek.rb.template \
+            > homebrew-tap/Casks/quotapeek.rb
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/quotapeek.rb
+          if git diff --cached --quiet -- Casks/quotapeek.rb; then
+            CASK_CHANGED=false
+          else
+            git commit -m "chore: update QuotaPeek to $VERSION"
+            CASK_CHANGED=true
+          fi
+          cd ..
+          brew untap geraldooi/tap >/dev/null 2>&1 || true
+          brew tap geraldooi/tap "$PWD/homebrew-tap"
+          brew audit --cask --online geraldooi/tap/quotapeek
+          if [ "$CASK_CHANGED" = true ]; then
+            git -C homebrew-tap push origin main
+          fi
