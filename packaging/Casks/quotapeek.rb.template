@@ -1,0 +1,17 @@
+cask "quotapeek" do
+  version "0.1.0"
+  sha256 "REPLACE_WITH_RELEASE_SHA256"
+
+  url "https://github.com/OWNER/quotapeek/releases/download/v#{version}/QuotaPeek-#{version}.zip"
+  name "QuotaPeek"
+  desc "Codex and Claude Code usage in the macOS menu bar"
+  homepage "https://github.com/OWNER/quotapeek"
+
+  depends_on macos: ">= :ventura"
+
+  app "QuotaPeek.app"
+
+  zap trash: [
+    "~/Library/Preferences/com.geraldooi.quotapeek.plist",
+  ]
+end
