@@ -11,6 +11,12 @@ cask "quotapeek" do
 
   app "QuotaPeek.app"
 
+  caveats <<~EOS
+    QuotaPeek is ad-hoc signed and is not notarized by Apple.
+    If macOS blocks the first launch, open System Settings → Privacy & Security
+    and click "Open Anyway" for QuotaPeek.
+  EOS
+
   zap trash: [
     "~/Library/Preferences/com.geraldooi.quotapeek.plist",
   ]
