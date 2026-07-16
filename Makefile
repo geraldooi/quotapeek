@@ -1,4 +1,4 @@
-.PHONY: app install test clean
+.PHONY: app install test verify clean
 
 export CLANG_MODULE_CACHE_PATH := $(CURDIR)/.build/clang-module-cache
 export SWIFTPM_MODULECACHE_OVERRIDE := $(CURDIR)/.build/swiftpm-module-cache
@@ -15,5 +15,10 @@ install: app
 test:
 	swift test --disable-sandbox --scratch-path .build
 
+verify:
+	$(MAKE) test
+	$(MAKE) app
+	./scripts/verify-app.sh
+
 clean:
-	rm -rf .build dist
+	rm -rf .build .build-* dist

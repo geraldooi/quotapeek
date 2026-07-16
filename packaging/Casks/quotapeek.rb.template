@@ -1,13 +1,13 @@
 cask "quotapeek" do
-  version "0.1.0"
-  sha256 "REPLACE_WITH_RELEASE_SHA256"
+  version "__VERSION__"
+  sha256 "__SHA256__"
 
-  url "https://github.com/OWNER/quotapeek/releases/download/v#{version}/QuotaPeek-#{version}.zip"
+  url "https://github.com/geraldooi/quotapeek/releases/download/v#{version}/QuotaPeek-#{version}.zip"
   name "QuotaPeek"
   desc "Codex and Claude Code usage in the macOS menu bar"
-  homepage "https://github.com/OWNER/quotapeek"
+  homepage "https://github.com/geraldooi/quotapeek"
 
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "QuotaPeek.app"
 
