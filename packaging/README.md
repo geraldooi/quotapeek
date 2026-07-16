@@ -1,54 +1,38 @@
 # Release and Homebrew packaging
 
-QuotaPeek uses GitHub Actions to build, sign, notarize, publish, and update its
-Homebrew cask. The workflow runs manually from `main`; merging a pull request
-does not release automatically.
+QuotaPeek uses GitHub Actions to build, publish, and update its Homebrew cask.
+The workflow runs manually from `main`; merging a pull request does not release
+automatically.
 
-## One-time Apple setup
+## Signing and Gatekeeper
 
-Public macOS distribution requires an active Apple Developer Program
-membership.
+Releases use an ad-hoc code signature and are not notarized by Apple. This keeps
+distribution independent of the paid Apple Developer Program.
 
-1. Install full Xcode and sign in with the Apple developer account.
-2. Create or install a **Developer ID Application** certificate.
-3. Export the certificate and private key from Keychain Access as a
-   password-protected `.p12` file.
-4. Create an App Store Connect API key with access to notarization and download
-   its `.p8` file. Record its key ID and issuer ID.
+Homebrew can install the app normally, but Gatekeeper may block its first
+launch. A user who trusts the release can:
 
-Local `make app` builds use ad-hoc signing and do not require these credentials.
+1. Try to open QuotaPeek.
+2. Open **System Settings → Privacy & Security**.
+3. Click **Open Anyway** for QuotaPeek.
 
-## GitHub repository secrets
+The release notes and Homebrew cask repeat this notice so users see it before
+launching the app.
 
-Add these Actions secrets to `geraldooi/quotapeek`:
+## GitHub repository secret
+
+Add this Actions repository secret to `geraldooi/quotapeek`:
 
 | Secret | Value |
 | --- | --- |
-| `MACOS_CERTIFICATE_P12` | Base64-encoded Developer ID `.p12` file |
-| `MACOS_CERTIFICATE_PASSWORD` | Password used when exporting the `.p12` |
-| `APPLE_API_KEY_P8` | Base64-encoded App Store Connect `.p8` file |
-| `APPLE_API_KEY_ID` | App Store Connect API key ID |
-| `APPLE_API_ISSUER_ID` | App Store Connect API issuer ID |
-| `TAP_GITHUB_TOKEN` | Repository secret containing a fine-grained token that can write contents to `geraldooi/homebrew-tap` |
+| `TAP_GITHUB_TOKEN` | Fine-grained token that can write repository contents to `geraldooi/homebrew-tap` |
 
-Encode the two credential files without copying their contents into the
-repository:
-
-```sh
-base64 -i DeveloperIDApplication.p12 | pbcopy
-base64 -i AuthKey_KEYID.p8 | pbcopy
-```
-
-Store the five Apple release secrets in a GitHub environment named
-`production`. Store `TAP_GITHUB_TOKEN` as a repository secret because it is
-used by the separate Homebrew publication job. An optional required reviewer
-can be added to the environment to provide a manual approval gate before
-signing and publishing.
+No Apple signing or notarization credentials are required.
 
 ## Homebrew tap
 
-The public tap repository must be named `geraldooi/homebrew-tap`. Homebrew maps
-that repository to the short tap name `geraldooi/tap`.
+The public tap repository is named `geraldooi/homebrew-tap`. Homebrew maps that
+repository to the short tap name `geraldooi/tap`.
 
 The release workflow writes:
 
@@ -73,7 +57,7 @@ brew upgrade --cask quotapeek
 
 If the GitHub release succeeds but updating the tap fails, rerun the Release
 workflow with the same version. It detects the existing release and retries the
-Homebrew publication without replacing the signed artifact.
+Homebrew publication without replacing the artifact.
 
 For manual recovery, download the release asset, calculate its checksum, and
 replace the version and checksum in the tap:

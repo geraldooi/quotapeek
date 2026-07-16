@@ -32,8 +32,8 @@ make app
 open dist/QuotaPeek.app
 ```
 
-`make app` creates a universal Apple Silicon and Intel app bundle. Local builds
-use an ad-hoc signature and are intended for development on your own Mac.
+`make app` creates an ad-hoc-signed universal Apple Silicon and Intel app
+bundle.
 
 To install the local build:
 
@@ -45,8 +45,10 @@ This copies the app to `~/Applications`, so administrator access is not needed.
 
 ## Homebrew distribution
 
-Stable releases are signed, notarized, and published through GitHub Actions.
-The release workflow updates the cask in
+Stable releases are ad-hoc signed and published through GitHub Actions. They
+are not notarized by Apple, so macOS may require first-launch approval under
+**System Settings → Privacy & Security → Open Anyway**. The release workflow
+updates the cask in
 [`geraldooi/homebrew-tap`](https://github.com/geraldooi/homebrew-tap), after
 which users can install with:
 

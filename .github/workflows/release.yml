@@ -17,11 +17,10 @@ concurrency:
 
 jobs:
   release:
-    name: Sign, notarize, and publish
+    name: Build and publish
     if: github.ref == 'refs/heads/main'
     runs-on: macos-15
-    timeout-minutes: 30
-    environment: production
+    timeout-minutes: 20
     outputs:
       version: ${{ steps.validate-version.outputs.version }}
 
@@ -53,86 +52,17 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Validate release credentials
-        if: steps.existing-release.outputs.exists != 'true'
-        env:
-          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
-        run: |
-          set -eu
-          : "${MACOS_CERTIFICATE_P12:?Missing MACOS_CERTIFICATE_P12 secret}"
-          : "${MACOS_CERTIFICATE_PASSWORD:?Missing MACOS_CERTIFICATE_PASSWORD secret}"
-          : "${APPLE_API_KEY_P8:?Missing APPLE_API_KEY_P8 secret}"
-          : "${APPLE_API_KEY_ID:?Missing APPLE_API_KEY_ID secret}"
-          : "${APPLE_API_ISSUER_ID:?Missing APPLE_API_ISSUER_ID secret}"
-
-      - name: Import Developer ID certificate
-        if: steps.existing-release.outputs.exists != 'true'
-        env:
-          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
-        run: |
-          set -eu
-          CERTIFICATE_PATH="$RUNNER_TEMP/developer-id.p12"
-          KEYCHAIN_PATH="$RUNNER_TEMP/quotapeek-signing.keychain-db"
-          printf '%s' "$MACOS_CERTIFICATE_P12" | base64 --decode > "$CERTIFICATE_PATH"
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERTIFICATE_PATH" \
-            -P "$MACOS_CERTIFICATE_PASSWORD" \
-            -A \
-            -t cert \
-            -f pkcs12 \
-            -k "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH"
-          security set-key-partition-list \
-            -S apple-tool:,apple: \
-            -s \
-            -k "$KEYCHAIN_PASSWORD" \
-            "$KEYCHAIN_PATH"
-          SIGNING_IDENTITY="$(
-            security find-identity -v -p codesigning "$KEYCHAIN_PATH" |
-              sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' |
-              head -n 1
-          )"
-          test -n "$SIGNING_IDENTITY"
-          echo "SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
-
-      - name: Test and build signed universal app
+      - name: Test and build ad-hoc-signed universal app
         if: steps.existing-release.outputs.exists != 'true'
         env:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
-          make test
-          make app
-          ./scripts/verify-app.sh
+          make verify
           codesign -dv --verbose=4 dist/QuotaPeek.app
 
-      - name: Notarize and staple
+      - name: Create release archive
         if: steps.existing-release.outputs.exists != 'true'
-        env:
-          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
-        run: |
-          set -eu
-          API_KEY_PATH="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
-          printf '%s' "$APPLE_API_KEY_P8" | base64 --decode > "$API_KEY_PATH"
-          ./scripts/create-release-archive.sh
-          xcrun notarytool submit "dist/QuotaPeek-$VERSION.zip" \
-            --key "$API_KEY_PATH" \
-            --key-id "$APPLE_API_KEY_ID" \
-            --issuer "$APPLE_API_ISSUER_ID" \
-            --wait
-          xcrun stapler staple dist/QuotaPeek.app
-          xcrun stapler validate dist/QuotaPeek.app
-          spctl --assess --type execute --verbose=2 dist/QuotaPeek.app
-          ./scripts/create-release-archive.sh
+        run: ./scripts/create-release-archive.sh
 
       - name: Publish GitHub release
         if: steps.existing-release.outputs.exists != 'true'
@@ -143,6 +73,7 @@ jobs:
           gh release create "v$VERSION" "dist/QuotaPeek-$VERSION.zip" \
             --target "$GITHUB_SHA" \
             --title "QuotaPeek $VERSION" \
+            --notes "QuotaPeek is ad-hoc signed and is not notarized by Apple. On first launch, macOS may require approval in System Settings → Privacy & Security → Open Anyway." \
             --generate-notes
 
       - name: Confirm release is available

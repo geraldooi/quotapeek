@@ -8,7 +8,6 @@ APP_DIR="$ROOT/dist/QuotaPeek.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
-SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 
 cd "$ROOT"
 swift build \
@@ -34,16 +33,6 @@ cp "$ROOT/packaging/Info.plist" "$CONTENTS_DIR/Info.plist"
     -c "Set :CFBundleVersion $BUILD_NUMBER" \
     "$CONTENTS_DIR/Info.plist"
 
-if [ "$SIGNING_IDENTITY" = "-" ]; then
-    codesign --force --deep --sign - "$APP_DIR"
-else
-    codesign \
-        --force \
-        --deep \
-        --options runtime \
-        --timestamp \
-        --sign "$SIGNING_IDENTITY" \
-        "$APP_DIR"
-fi
+codesign --force --deep --sign - "$APP_DIR"
 
 echo "Created $APP_DIR"
