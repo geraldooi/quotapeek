@@ -45,6 +45,7 @@ struct UsagePopover: View {
                 state.refresh()
             } label: {
                 Image(systemName: "arrow.clockwise")
+                    .frame(width: 18, height: 18)
                     .rotationEffect(.degrees(refreshRotation))
             }
             .buttonStyle(.plain)
