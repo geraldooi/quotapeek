@@ -1,8 +1,9 @@
 # Release and Homebrew packaging
 
-QuotaPeek uses GitHub Actions to build, publish, and update its Homebrew cask.
-The workflow runs manually from `main`; merging a pull request does not release
-automatically.
+QuotaPeek uses Release Please and GitHub Actions to version, build, publish, and
+update its Homebrew cask. Feature and fix merges update a cumulative release
+pull request. Merging that release pull request automatically publishes the
+version it contains.
 
 ## Signing and Gatekeeper
 
@@ -21,13 +22,26 @@ launching the app.
 
 ## GitHub repository secret
 
-Add this Actions repository secret to `geraldooi/quotapeek`:
+Add these Actions repository secrets to `geraldooi/quotapeek`:
 
 | Secret | Value |
 | --- | --- |
+| `RELEASE_PLEASE_TOKEN` | Fine-grained token scoped to `geraldooi/quotapeek` with read/write access to contents, issues, and pull requests |
 | `TAP_GITHUB_TOKEN` | Fine-grained token that can write repository contents to `geraldooi/homebrew-tap` |
 
-No Apple signing or notarization credentials are required.
+`RELEASE_PLEASE_TOKEN` is required so CI runs automatically on the generated
+release pull request. The Release workflow fails with setup guidance if it is
+absent. Keep the two tokens separate and grant each access only to its named
+repository. No Apple signing or notarization credentials are required.
+
+## Automated release flow
+
+1. Merge feature and fix pull requests with Conventional Commit titles.
+2. Release Please creates or updates its release pull request with the proposed
+   `VERSION` and generated `CHANGELOG.md`.
+3. Merge the release pull request when the accumulated changes are ready.
+4. The Release workflow creates the tag and GitHub release, uploads the
+   universal archive, and publishes the Homebrew cask.
 
 ## Homebrew tap
 
@@ -55,9 +69,10 @@ brew upgrade --cask quotapeek
 
 ## Manual recovery
 
-If the GitHub release succeeds but updating the tap fails, rerun the Release
-workflow with the same version. It detects the existing release and retries the
-Homebrew publication without replacing the artifact.
+If creating the GitHub release succeeds but packaging or updating the tap
+fails, manually run the **Release** workflow with that existing version. It
+rebuilds a missing archive and retries Homebrew publication without replacing
+an archive that is already attached.
 
 For manual recovery, download the release asset, calculate its checksum, and
 replace the version and checksum in the tap:

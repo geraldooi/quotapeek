@@ -1,59 +1,113 @@
 name: Release
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       version:
-        description: Version from the VERSION file, without the v prefix
+        description: Existing version to rebuild or republish, without the v prefix
         required: true
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build and publish
-    if: github.ref == 'refs/heads/main'
-    runs-on: macos-15
-    timeout-minutes: 20
+  release_please:
+    name: Propose or create release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     outputs:
-      version: ${{ steps.validate-version.outputs.version }}
+      release_created: ${{ steps.release.outputs.release_created }}
+      version: ${{ steps.release.outputs.version }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      sha: ${{ steps.release.outputs.sha }}
 
     steps:
-      - name: Check out source
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Require release automation token
+        if: github.event_name == 'push'
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_PLEASE_TOKEN" ]; then
+            echo "Add the RELEASE_PLEASE_TOKEN repository secret before merging." >&2
+            exit 1
+          fi
 
-      - name: Validate version
+      - name: Create or update release pull request
+        id: release
+        if: github.event_name == 'push'
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      - name: Use manual recovery mode
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "Recovering existing release v${{ inputs.version }}"
+
+  release:
+    name: Build and publish
+    needs: release_please
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.release_please.outputs.release_created == 'true'
+    runs-on: macos-15
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.validate-version.outputs.version }}
+      tag_name: ${{ steps.validate-version.outputs.tag_name }}
+
+    steps:
+      - name: Check out released source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: >-
+            ${{ github.event_name == 'workflow_dispatch' &&
+                format('v{0}', inputs.version) ||
+                needs.release_please.outputs.sha }}
+
+      - name: Validate version and release
         id: validate-version
         env:
+          AUTO_TAG_NAME: ${{ needs.release_please.outputs.tag_name }}
+          AUTO_VERSION: ${{ needs.release_please.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
           REQUESTED_VERSION: ${{ inputs.version }}
         run: |
           set -eu
-          test "$REQUESTED_VERSION" = "$(tr -d '[:space:]' < VERSION)"
-          printf '%s\n' "$REQUESTED_VERSION" |
-            grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' ||
-            { echo "Version must use semantic versioning, for example 0.1.0" >&2; exit 1; }
-          echo "VERSION=$REQUESTED_VERSION" >> "$GITHUB_ENV"
-          echo "version=$REQUESTED_VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Check for an existing release
-        id: existing-release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "v$VERSION" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            VERSION="$REQUESTED_VERSION"
+            TAG_NAME="v$VERSION"
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            VERSION="$AUTO_VERSION"
+            TAG_NAME="$AUTO_TAG_NAME"
           fi
 
+          printf '%s\n' "$VERSION" |
+            grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' ||
+            { echo "Version must use semantic versioning, for example 0.2.0" >&2; exit 1; }
+          test "$VERSION" = "$(tr -d '[:space:]' < VERSION)"
+          test "$TAG_NAME" = "v$VERSION"
+          gh release view "$TAG_NAME" >/dev/null
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+
       - name: Test and build ad-hoc-signed universal app
-        if: steps.existing-release.outputs.exists != 'true'
         env:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
@@ -61,37 +115,62 @@ jobs:
           codesign -dv --verbose=4 dist/QuotaPeek.app
 
       - name: Create release archive
-        if: steps.existing-release.outputs.exists != 'true'
         run: ./scripts/create-release-archive.sh
 
-      - name: Publish GitHub release
-        if: steps.existing-release.outputs.exists != 'true'
+      - name: Upload release archive
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          gh release create "v$VERSION" "dist/QuotaPeek-$VERSION.zip" \
-            --target "$GITHUB_SHA" \
-            --title "QuotaPeek $VERSION" \
-            --notes "QuotaPeek is ad-hoc signed and is not notarized by Apple. On first launch, macOS may require approval in System Settings → Privacy & Security → Open Anyway." \
-            --generate-notes
+          ASSET="QuotaPeek-$VERSION.zip"
+
+          if gh release view "$TAG_NAME" --json assets --jq '.assets[].name' |
+            grep -Fxq "$ASSET"; then
+            echo "$ASSET is already attached to $TAG_NAME; leaving it unchanged."
+          else
+            gh release upload "$TAG_NAME" "dist/$ASSET"
+          fi
+
+      - name: Add distribution notice to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          UPDATED_NOTES_FILE="$RUNNER_TEMP/release-notes-updated.md"
+          NOTICE='QuotaPeek is ad-hoc signed and is not notarized by Apple. On first launch, macOS may require approval in System Settings → Privacy & Security → Open Anyway.'
+
+          gh release view "$TAG_NAME" --json body --jq .body > "$NOTES_FILE"
+          if ! grep -Fq 'QuotaPeek is ad-hoc signed' "$NOTES_FILE"; then
+            {
+              printf '%s\n\n' "$NOTICE"
+              cat "$NOTES_FILE"
+            } > "$UPDATED_NOTES_FILE"
+            gh release edit "$TAG_NAME" --notes-file "$UPDATED_NOTES_FILE"
+          fi
+          gh release edit "$TAG_NAME" --title "QuotaPeek $VERSION"
 
       - name: Confirm release is available
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release view "v$VERSION"
+        run: gh release view "$TAG_NAME"
 
   homebrew:
     name: Publish Homebrew cask
     needs: release
     runs-on: macos-15
     timeout-minutes: 15
+    permissions:
+      contents: read
     env:
+      TAG_NAME: ${{ needs.release.outputs.tag_name }}
       VERSION: ${{ needs.release.outputs.version }}
 
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ env.TAG_NAME }}
 
       - name: Check out Homebrew tap
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -105,7 +184,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p dist
-          gh release download "v$VERSION" \
+          gh release download "$TAG_NAME" \
             --pattern "QuotaPeek-$VERSION.zip" \
             --dir dist
 
