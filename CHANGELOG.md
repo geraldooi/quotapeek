@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/geraldooi/quotapeek/compare/v0.2.0...v0.3.0) (2026-07-17)
+
+
+### Features
+
+* **ui:** show app version in popover footer ([#7](https://github.com/geraldooi/quotapeek/issues/7)) ([b41c1b8](https://github.com/geraldooi/quotapeek/commit/b41c1b8a3e4ea251fc54a01c03d4f6c90e279878))
+
 ## [0.2.0](https://github.com/geraldooi/quotapeek/compare/v0.1.0...v0.2.0) (2026-07-17)
 
 
