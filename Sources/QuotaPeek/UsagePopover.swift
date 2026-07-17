@@ -18,11 +18,13 @@ struct UsagePopover: View {
                 }
                 .padding(14)
             }
+            .frame(maxHeight: 520)
+            .fixedSize(horizontal: false, vertical: true)
 
             Divider()
             footer
         }
-        .frame(width: 360, height: 480)
+        .frame(width: 360)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
