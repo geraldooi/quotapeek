@@ -45,16 +45,20 @@ This copies the app to `~/Applications`, so administrator access is not needed.
 
 ## Homebrew distribution
 
-Stable releases are ad-hoc signed and published through GitHub Actions. They
-are not notarized by Apple, so macOS may require first-launch approval under
-**System Settings → Privacy & Security → Open Anyway**. The release workflow
-updates the cask in
+Stable releases are versioned and published through GitHub Actions. Release
+Please keeps a release pull request updated from conventional feature and fix
+titles. Merging that release pull request publishes the app and updates the
+cask in
 [`geraldooi/homebrew-tap`](https://github.com/geraldooi/homebrew-tap), after
 which users can install with:
 
 ```sh
 brew install --cask geraldooi/tap/quotapeek
 ```
+
+Releases are ad-hoc signed and are not notarized by Apple, so macOS may require
+first-launch approval under **System Settings → Privacy & Security → Open
+Anyway**.
 
 See [packaging/README.md](packaging/README.md) for the release steps.
 

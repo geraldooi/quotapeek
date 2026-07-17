@@ -4,6 +4,11 @@ on:
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
   push:
     branches:
       - main
@@ -20,6 +25,30 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Validate pull request title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -eu
+          PATTERN='^(feat|fix|refactor|docs|test|chore|perf|ci|build)(\([a-z0-9][a-z0-9._/-]*\))?!?: [^[:space:]].*$'
+
+          if [ "${#PR_TITLE}" -gt 72 ]; then
+            echo "Pull request title must be at most 72 characters." >&2
+            exit 1
+          fi
+
+          if [[ "$PR_TITLE" == *. ]]; then
+            echo "Pull request title must not end with a period." >&2
+            exit 1
+          fi
+
+          if ! [[ "$PR_TITLE" =~ $PATTERN ]]; then
+            echo "Pull request title must follow Conventional Commits." >&2
+            echo "Example: feat(ui): size popover to usage content" >&2
+            exit 1
+          fi
 
       - name: Verify tests and universal app bundle
         run: make verify
