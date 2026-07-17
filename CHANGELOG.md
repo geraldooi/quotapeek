@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/geraldooi/quotapeek/compare/v0.1.0...v0.2.0) (2026-07-17)
+
+
+### Features
+
+* **release:** automate semantic version releases ([#5](https://github.com/geraldooi/quotapeek/issues/5)) ([ece0287](https://github.com/geraldooi/quotapeek/commit/ece02877b9be9b69682bd703389abd6d61050c78))
+* **ui:** size popover to usage content ([#4](https://github.com/geraldooi/quotapeek/issues/4)) ([841fb49](https://github.com/geraldooi/quotapeek/commit/841fb49a54fdf17fba8faca17aa96b71421d418a))
+
 ## 0.1.0 (2026-07-16)
 
 ### Features
