@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import QuotaPeekCore
 
@@ -58,17 +59,23 @@ struct UsagePopover: View {
     }
 
     private var footer: some View {
-        HStack {
-            if let lastRefresh = state.lastRefresh {
-                HStack(spacing: 3) {
+        HStack(spacing: 8) {
+            HStack(spacing: 3) {
+                if let lastRefresh = state.lastRefresh {
                     Text("Updated")
                     Text(lastRefresh, style: .relative)
                 }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer()
+            Text(versionLabel)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .accessibilityLabel("QuotaPeek version \(versionLabel)")
+                .fixedSize()
 
             Button("Quit") {
                 state.quit()
@@ -76,9 +83,21 @@ struct UsagePopover: View {
             .buttonStyle(.plain)
             .font(.caption)
             .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 16)
         .frame(height: 42)
+    }
+
+    private var versionLabel: String {
+        guard let version = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String else {
+            return "Development"
+        }
+
+        let trimmedVersion = version.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedVersion.isEmpty ? "Development" : "v\(trimmedVersion)"
     }
 }
 
