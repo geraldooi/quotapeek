@@ -23,6 +23,27 @@ struct CodexResetForecastTests {
         #expect(forecast.nextRefreshAt == ISO8601DateFormatter().date(from: "2026-07-18T06:02:04Z"))
     }
 
+    @Test("Parses public forecast timestamps with fractional seconds")
+    func parsesFractionalSecondTimestamps() throws {
+        let data = try #require(
+            """
+            {
+              "fetchedAt": "2026-07-18T07:32:08.628Z",
+              "nextRefreshAt": "2026-07-18T08:02:08.628Z",
+              "forecast": { "score": 88 }
+            }
+            """.data(using: .utf8)
+        )
+
+        let forecast = try #require(CodexResetForecastParser.parse(data: data))
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        #expect(forecast.score == 88)
+        #expect(forecast.fetchedAt == formatter.date(from: "2026-07-18T07:32:08.628Z"))
+        #expect(forecast.nextRefreshAt == formatter.date(from: "2026-07-18T08:02:08.628Z"))
+    }
+
     @Test("Rejects scores outside the probability range")
     func rejectsInvalidScore() throws {
         let data = try #require(

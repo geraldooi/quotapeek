@@ -23,7 +23,23 @@ public struct CodexResetForecast: Equatable, Sendable {
 public enum CodexResetForecastParser {
     public static func parse(data: Data) -> CodexResetForecast? {
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+
+            let fractionalFormatter = ISO8601DateFormatter()
+            fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+            if let date = fractionalFormatter.date(from: value)
+                ?? ISO8601DateFormatter().date(from: value) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Expected an ISO-8601 timestamp"
+            )
+        }
 
         guard
             let response = try? decoder.decode(ForecastResponse.self, from: data),
