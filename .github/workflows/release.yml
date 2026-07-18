@@ -189,6 +189,8 @@ jobs:
             --dir dist
 
       - name: Publish Homebrew cask
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
         run: |
           set -eu
           SHA256="$(shasum -a 256 "dist/QuotaPeek-$VERSION.zip" | awk '{print $1}')"
