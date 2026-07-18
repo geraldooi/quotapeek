@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/geraldooi/quotapeek/compare/v0.3.0...v0.4.0) (2026-07-18)
+
+
+### Features
+
+* **codex:** add reset probability forecast ([#9](https://github.com/geraldooi/quotapeek/issues/9)) ([b41cab7](https://github.com/geraldooi/quotapeek/commit/b41cab79b30353ac59c08683374a6488ee43626e))
+
 ## [0.3.0](https://github.com/geraldooi/quotapeek/compare/v0.2.0...v0.3.0) (2026-07-17)
 
 
