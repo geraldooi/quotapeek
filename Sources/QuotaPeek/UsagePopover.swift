@@ -14,8 +14,12 @@ struct UsagePopover: View {
 
             ScrollView {
                 VStack(spacing: 12) {
-                    ProviderCard(snapshot: state.codex, tint: .blue)
-                    ProviderCard(snapshot: state.claude, tint: .orange)
+                    ProviderCard(
+                        snapshot: state.codex,
+                        tint: .blue,
+                        resetForecast: state.codexResetForecast
+                    )
+                    ProviderCard(snapshot: state.claude, tint: .orange, resetForecast: nil)
                 }
                 .padding(14)
             }
@@ -104,6 +108,7 @@ struct UsagePopover: View {
 private struct ProviderCard: View {
     let snapshot: UsageSnapshot
     let tint: Color
+    let resetForecast: CodexResetForecast?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -127,8 +132,12 @@ private struct ProviderCard: View {
             }
 
             if snapshot.isAvailable {
-                ForEach(Array(snapshot.windows.enumerated()), id: \.offset) { _, window in
-                    UsageWindowRow(window: window, tint: tint)
+                ForEach(Array(snapshot.windows.enumerated()), id: \.offset) { index, window in
+                    UsageWindowRow(
+                        window: window,
+                        tint: tint,
+                        resetForecast: index == snapshot.windows.count - 1 ? resetForecast : nil
+                    )
                 }
 
                 tokenBreakdown
@@ -166,6 +175,7 @@ private struct ProviderCard: View {
 private struct UsageWindowRow: View {
     let window: UsageWindow
     let tint: Color
+    let resetForecast: CodexResetForecast?
 
     var body: some View {
         VStack(spacing: 7) {
@@ -195,7 +205,20 @@ private struct UsageWindowRow: View {
                     }
                     Spacer()
                     if let resetAt = window.resetAt {
-                        Text(UsageFormatting.reset(resetAt))
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(UsageFormatting.reset(resetAt))
+
+                            if let resetForecast {
+                                (
+                                    Text("\(resetForecast.score)%").fontWeight(.medium)
+                                    + Text(" chance · next 48h")
+                                )
+                                .help("Unofficial estimate from willcodexquotareset.com")
+                                .accessibilityLabel(
+                                    "\(resetForecast.score) percent chance of a Codex reset in the next 48 hours"
+                                )
+                            }
+                        }
                     }
                 }
                 .font(.caption2)
