@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/geraldooi/quotapeek/compare/v0.4.1...v0.4.2) (2026-07-18)
+
+
+### Bug Fixes
+
+* **ui:** remove misleading token breakdown ([#14](https://github.com/geraldooi/quotapeek/issues/14)) ([a8c9690](https://github.com/geraldooi/quotapeek/commit/a8c9690748d2f0743b7f53428777ebde5bb10a06))
+
 ## [0.4.1](https://github.com/geraldooi/quotapeek/compare/v0.4.0...v0.4.1) (2026-07-18)
 
 
