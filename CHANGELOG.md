@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/geraldooi/quotapeek/compare/v0.4.0...v0.4.1) (2026-07-18)
+
+
+### Bug Fixes
+
+* **codex:** parse fractional forecast timestamps ([#12](https://github.com/geraldooi/quotapeek/issues/12)) ([73bd79e](https://github.com/geraldooi/quotapeek/commit/73bd79e6cdae1b65c6cd224ed2592f8e01d7a8b3))
+
 ## [0.4.0](https://github.com/geraldooi/quotapeek/compare/v0.3.0...v0.4.0) (2026-07-18)
 
 
