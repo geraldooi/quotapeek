@@ -139,8 +139,6 @@ private struct ProviderCard: View {
                         resetForecast: index == snapshot.windows.count - 1 ? resetForecast : nil
                     )
                 }
-
-                tokenBreakdown
             } else {
                 Text(snapshot.statusMessage ?? "Usage unavailable")
                     .font(.callout)
@@ -158,17 +156,6 @@ private struct ProviderCard: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.primary.opacity(0.07), lineWidth: 1)
         )
-    }
-
-    private var tokenBreakdown: some View {
-        HStack(spacing: 0) {
-            TokenMetric(label: "Input", value: snapshot.tokens.input)
-            Divider().frame(height: 28)
-            TokenMetric(label: "Cached", value: snapshot.tokens.cachedInput)
-            Divider().frame(height: 28)
-            TokenMetric(label: "Output", value: snapshot.tokens.output)
-        }
-        .padding(.top, 2)
     }
 }
 
@@ -231,21 +218,5 @@ private struct UsageWindowRow: View {
         if used >= 90 { return .red }
         if used >= 75 { return .orange }
         return tint
-    }
-}
-
-private struct TokenMetric: View {
-    let label: String
-    let value: Int
-
-    var body: some View {
-        VStack(spacing: 2) {
-            Text(UsageFormatting.tokens(value))
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
     }
 }
