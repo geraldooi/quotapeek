@@ -16,7 +16,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "QuotaPeek",
-            dependencies: ["QuotaPeekCore"]
+            dependencies: ["QuotaPeekCore"],
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "QuotaPeekCoreTests",

@@ -6,6 +6,8 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 BUILD_DIR="$ROOT/.build"
 APP_DIR="$ROOT/dist/QuotaPeek.app"
 CONTENTS_DIR="$APP_DIR/Contents"
+BRAND_ICON_SOURCE_DIR="$ROOT/Sources/QuotaPeek/Resources/BrandIcons"
+BRAND_ICON_DEST_DIR="$CONTENTS_DIR/Resources/BrandIcons"
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
 
@@ -22,12 +24,15 @@ swift build \
     --scratch-path "$BUILD_DIR/x86_64"
 
 rm -rf "$APP_DIR"
-mkdir -p "$CONTENTS_DIR/MacOS" "$CONTENTS_DIR/Resources"
+mkdir -p "$CONTENTS_DIR/MacOS" "$BRAND_ICON_DEST_DIR"
 lipo -create \
     "$BUILD_DIR/arm64/arm64-apple-macosx/release/QuotaPeek" \
     "$BUILD_DIR/x86_64/x86_64-apple-macosx/release/QuotaPeek" \
     -output "$CONTENTS_DIR/MacOS/QuotaPeek"
 cp "$ROOT/packaging/Info.plist" "$CONTENTS_DIR/Info.plist"
+cp "$BRAND_ICON_SOURCE_DIR/codex.svg" "$BRAND_ICON_DEST_DIR/codex.svg"
+cp "$BRAND_ICON_SOURCE_DIR/claude-code.svg" "$BRAND_ICON_DEST_DIR/claude-code.svg"
+cp "$BRAND_ICON_SOURCE_DIR/NOTICE.md" "$BRAND_ICON_DEST_DIR/NOTICE.md"
 /usr/libexec/PlistBuddy \
     -c "Set :CFBundleShortVersionString $VERSION" \
     -c "Set :CFBundleVersion $BUILD_NUMBER" \
