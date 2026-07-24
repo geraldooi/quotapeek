@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/geraldooi/quotapeek/compare/v0.4.2...v0.5.0) (2026-07-24)
+
+
+### Features
+
+* **ui:** use LobeHub provider logos ([#16](https://github.com/geraldooi/quotapeek/issues/16)) ([8c0e12a](https://github.com/geraldooi/quotapeek/commit/8c0e12ac980765e0d5cae1cf2e3d378903cd4388))
+
 ## [0.4.2](https://github.com/geraldooi/quotapeek/compare/v0.4.1...v0.4.2) (2026-07-18)
 
 
