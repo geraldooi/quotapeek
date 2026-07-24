@@ -114,6 +114,7 @@ private struct ProviderCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
                 ProviderLogo(provider: snapshot.provider)
+                    .foregroundStyle(.primary)
                     .frame(width: 28, height: 28)
 
                 Text(snapshot.provider.displayName)
@@ -163,7 +164,7 @@ private struct ProviderLogo: View {
         if let image = logoImage {
             Image(nsImage: image)
                 .resizable()
-                .renderingMode(.original)
+                .renderingMode(.template)
                 .scaledToFit()
                 .frame(width: 28, height: 28)
                 .accessibilityHidden(true)
