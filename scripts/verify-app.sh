@@ -9,6 +9,9 @@ EXPECTED_VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
 
 test -d "$APP_DIR"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_DIR/Contents/Info.plist")" = "$EXPECTED_VERSION"
+test -f "$APP_DIR/Contents/Resources/BrandIcons/codex.svg"
+test -f "$APP_DIR/Contents/Resources/BrandIcons/claude-code.svg"
+test -f "$APP_DIR/Contents/Resources/BrandIcons/NOTICE.md"
 
 ARCHITECTURES="$(lipo -archs "$BINARY")"
 case " $ARCHITECTURES " in
