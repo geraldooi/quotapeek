@@ -6,7 +6,8 @@ A small, native macOS menu-bar app for seeing Codex and Claude Code token usage 
 
 - **Codex:** rolling usage percentage, remaining percentage, reset time, next-48-hour reset forecast, and current-session token totals.
 - **Claude Code:** tokens used in the last five hours, tokens used today, and input/cache/output totals.
-- A compact menu-bar summary with Codex's rolling percentage and Claude's five-hour token count.
+- A compact menu-bar summary with Codex's rolling percentage (or session tokens when limits are unavailable) and Claude's five-hour token count.
+- Actionable recovery states with privacy-safe diagnostics when local usage cannot be read.
 - A native SwiftUI popover that refreshes automatically every minute.
 
 QuotaPeek reads usage records locally from:

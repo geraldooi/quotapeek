@@ -37,6 +37,66 @@ struct ClaudeUsageParserTests {
         #expect(snapshot.statusMessage == "No Claude Code usage found")
     }
 
+    @Test("Returns no recent activity when readable records are outside display windows")
+    func returnsNoRecentActivityForOldRecords() throws {
+        let now = try #require(ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z"))
+        let lines = [
+            claudeLine(
+                id: "old",
+                timestamp: "2026-07-22T11:00:00.000Z",
+                input: 100,
+                output: 20,
+                cached: 30
+            )
+        ]
+
+        let snapshot = ClaudeUsageParser.aggregate(
+            lines: lines,
+            now: now,
+            calendar: utcCalendar
+        )
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .noRecentActivity)
+        #expect(snapshot.updatedAt == ISO8601DateFormatter().date(from: "2026-07-22T11:00:00Z"))
+    }
+
+    @Test("Accepts fractional-second timestamps written by Claude Code")
+    func acceptsFractionalSecondTimestamps() throws {
+        let now = try #require(ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z"))
+        let lines = [
+            claudeLine(
+                id: "fractional",
+                timestamp: "2026-07-24T11:27:25.453Z",
+                input: 100,
+                output: 20,
+                cached: 30
+            )
+        ]
+
+        let snapshot = ClaudeUsageParser.aggregate(
+            lines: lines,
+            now: now,
+            calendar: utcCalendar
+        )
+
+        #expect(snapshot.isAvailable)
+        #expect(snapshot.health == .ready)
+        #expect(snapshot.windows.first?.tokens == 150)
+    }
+
+    @Test("Reader explains when the Claude Code data folder is missing")
+    func readerExplainsMissingDataFolder() {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+
+        let snapshot = ClaudeUsageReader(homeDirectory: root).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .dataFolderNotFound)
+        #expect(snapshot.diagnostics?.dataPath == "~/.claude/projects")
+    }
+
     private var utcCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

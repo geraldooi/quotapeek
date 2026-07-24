@@ -62,6 +62,13 @@ struct CodexUsageParserTests {
         #expect(CodexUsageParser.parse(line: line) == nil)
     }
 
+    @Test("Ignores empty token events so older usable records remain discoverable")
+    func ignoresTokenEventsWithoutUsageOrLimits() {
+        let line = #"{"timestamp":"2026-07-24T11:30:00Z","payload":{"type":"token_count","info":null,"rate_limits":null}}"#
+
+        #expect(CodexUsageParser.parse(line: line) == nil)
+    }
+
     @Test("Reader chooses newest event rather than newest file modification")
     func readerChoosesNewestEventTimestamp() throws {
         let root = FileManager.default.temporaryDirectory
@@ -92,6 +99,48 @@ struct CodexUsageParserTests {
 
         #expect(snapshot.isAvailable)
         #expect(snapshot.windows.first?.usedPercent == 25)
+    }
+
+    @Test("Reader shows session tokens when quota limits are unavailable")
+    func readerShowsSessionTokensWithoutQuotaLimits() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        let sessions = root
+            .appendingPathComponent(".codex")
+            .appendingPathComponent("sessions")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let line = """
+        {"timestamp":"2026-07-24T11:27:25.453Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":20,"total_tokens":120},"model_context_window":258400},"rate_limits":{}}}
+        """
+        try line.write(
+            to: sessions.appendingPathComponent("session.jsonl"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let snapshot = CodexUsageReader(homeDirectory: root).load()
+
+        #expect(snapshot.isAvailable)
+        #expect(snapshot.health == .limited)
+        #expect(snapshot.issue?.kind == .quotaLimitsUnavailable)
+        #expect(snapshot.windows.count == 1)
+        #expect(snapshot.windows.first?.label == "Current session")
+        #expect(snapshot.windows.first?.tokens == 120)
+        #expect(snapshot.diagnostics?.readableRecords == 1)
+    }
+
+    @Test("Reader explains when the Codex data folder is missing")
+    func readerExplainsMissingDataFolder() {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+
+        let snapshot = CodexUsageReader(homeDirectory: root).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .dataFolderNotFound)
+        #expect(snapshot.diagnostics?.dataPath.contains("~/.codex") == true)
     }
 
     private func codexLine(timestamp: String, usedPercent: Double) -> String {

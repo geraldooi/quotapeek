@@ -5,21 +5,22 @@ import QuotaPeekCore
 
 @MainActor
 final class AppState: ObservableObject {
-    @Published private(set) var codex = UsageSnapshot.unavailable(.codex, message: "Loading…")
-    @Published private(set) var claude = UsageSnapshot.unavailable(.claude, message: "Loading…")
+    @Published private(set) var codex = UsageSnapshot.loading(.codex)
+    @Published private(set) var claude = UsageSnapshot.loading(.claude)
     @Published private(set) var codexResetForecast: CodexResetForecast?
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastRefresh: Date?
+    @Published private(set) var lastRefreshWasManual = false
 
     private var timer: AnyCancellable?
     private var forecastRefreshAfter = Date.distantPast
 
     init() {
-        refresh()
+        refresh(announcesCompletion: false)
         timer = Timer.publish(every: 60, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                self?.refresh()
+                self?.refresh(announcesCompletion: false)
             }
     }
 
@@ -27,6 +28,8 @@ final class AppState: ObservableObject {
         var parts: [String] = []
         if let used = codex.windows.first?.usedPercent {
             parts.append("C \(Int(used.rounded()))%")
+        } else if let tokens = codex.windows.first?.tokens {
+            parts.append("C \(UsageFormatting.tokens(tokens))")
         }
         if let tokens = claude.windows.first?.tokens {
             parts.append("A \(UsageFormatting.tokens(tokens))")
@@ -34,7 +37,30 @@ final class AppState: ObservableObject {
         return parts.isEmpty ? "Tokens" : parts.joined(separator: " · ")
     }
 
-    func refresh() {
+    var refreshSummary: String {
+        if isRefreshing {
+            return "Refreshing local usage…"
+        }
+        guard lastRefresh != nil else {
+            return "Checking local usage…"
+        }
+
+        let attentionCount = [codex, claude].filter(\.needsAttention).count
+        switch attentionCount {
+        case 0:
+            return lastRefreshWasManual ? "Usage refreshed" : "All usage sources are working"
+        case 1:
+            return lastRefreshWasManual
+                ? "Refreshed · 1 usage source needs attention"
+                : "1 usage source needs attention"
+        default:
+            return lastRefreshWasManual
+                ? "Refreshed · \(attentionCount) usage sources need attention"
+                : "\(attentionCount) usage sources need attention"
+        }
+    }
+
+    func refresh(announcesCompletion: Bool = true) {
         guard !isRefreshing else { return }
         isRefreshing = true
         let shouldRefreshForecast = Date() >= forecastRefreshAfter
@@ -77,7 +103,22 @@ final class AppState: ObservableObject {
 
             lastRefresh = Date()
             isRefreshing = false
+            lastRefreshWasManual = announcesCompletion
+            if announcesCompletion {
+                announceRefreshCompletion()
+            }
         }
+    }
+
+    private func announceRefreshCompletion() {
+        NSAccessibility.post(
+            element: NSApplication.shared,
+            notification: .announcementRequested,
+            userInfo: [
+                .announcement: refreshSummary,
+                .priority: NSNumber(value: NSAccessibilityPriorityLevel.medium.rawValue)
+            ]
+        )
     }
 
     func quit() {
