@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import QuotaPeekCore
@@ -17,9 +18,17 @@ struct UsagePopover: View {
                     ProviderCard(
                         snapshot: state.codex,
                         tint: .blue,
-                        resetForecast: state.codexResetForecast
+                        resetForecast: state.codexResetForecast,
+                        appVersion: versionLabel,
+                        onRefresh: { state.refresh() }
                     )
-                    ProviderCard(snapshot: state.claude, tint: .orange, resetForecast: nil)
+                    ProviderCard(
+                        snapshot: state.claude,
+                        tint: .orange,
+                        resetForecast: nil,
+                        appVersion: versionLabel,
+                        onRefresh: { state.refresh() }
+                    )
                 }
                 .padding(14)
             }
@@ -41,6 +50,9 @@ struct UsagePopover: View {
                 Text("Codex and Claude Code")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text(state.refreshSummary)
+                    .font(.caption2)
+                    .foregroundStyle(summaryColor)
             }
 
             Spacer()
@@ -57,9 +69,17 @@ struct UsagePopover: View {
             }
             .buttonStyle(.plain)
             .help("Refresh usage")
+            .accessibilityLabel("Refresh token usage")
             .disabled(state.isRefreshing)
         }
         .padding(16)
+    }
+
+    private var summaryColor: Color {
+        if state.isRefreshing {
+            return .secondary
+        }
+        return state.codex.needsAttention || state.claude.needsAttention ? .orange : .secondary
     }
 
     private var footer: some View {
@@ -109,6 +129,10 @@ private struct ProviderCard: View {
     let snapshot: UsageSnapshot
     let tint: Color
     let resetForecast: CodexResetForecast?
+    let appVersion: String
+    let onRefresh: () -> Void
+
+    @State private var showsDiagnostics = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -122,14 +146,19 @@ private struct ProviderCard: View {
 
                 Spacer()
 
-                if snapshot.isAvailable {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 7, height: 7)
-                }
+                ProviderStatusBadge(health: snapshot.health)
             }
 
-            if snapshot.isAvailable {
+            if snapshot.health == .loading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Checking local usage…")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 8)
+            } else {
                 ForEach(Array(snapshot.windows.enumerated()), id: \.offset) { index, window in
                     UsageWindowRow(
                         window: window,
@@ -137,12 +166,15 @@ private struct ProviderCard: View {
                         resetForecast: index == snapshot.windows.count - 1 ? resetForecast : nil
                     )
                 }
-            } else {
-                Text(snapshot.statusMessage ?? "Usage unavailable")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
+
+                if let issue = snapshot.issue {
+                    UsageIssueView(
+                        issue: issue,
+                        canShowDiagnostics: snapshot.diagnostics != nil,
+                        onRefresh: onRefresh,
+                        onShowDiagnostics: { showsDiagnostics = true }
+                    )
+                }
             }
         }
         .padding(14)
@@ -154,6 +186,155 @@ private struct ProviderCard: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.primary.opacity(0.07), lineWidth: 1)
         )
+        .sheet(isPresented: $showsDiagnostics) {
+            DiagnosticsSheet(snapshot: snapshot, appVersion: appVersion)
+        }
+    }
+}
+
+private struct ProviderStatusBadge: View {
+    let health: UsageHealth
+
+    var body: some View {
+        Label(label, systemImage: icon)
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(color)
+            .accessibilityLabel(label)
+    }
+
+    private var label: String {
+        switch health {
+        case .loading: "Loading"
+        case .ready: "Working"
+        case .limited: "Limited"
+        case .needsAttention: "Needs attention"
+        }
+    }
+
+    private var icon: String {
+        switch health {
+        case .loading: "ellipsis.circle"
+        case .ready: "checkmark.circle.fill"
+        case .limited, .needsAttention: "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var color: Color {
+        switch health {
+        case .loading: .secondary
+        case .ready: .green
+        case .limited, .needsAttention: .orange
+        }
+    }
+}
+
+private struct UsageIssueView: View {
+    let issue: UsageIssue
+    let canShowDiagnostics: Bool
+    let onRefresh: () -> Void
+    let onShowDiagnostics: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(issue.title, systemImage: "exclamationmark.triangle.fill")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(.orange)
+
+            Text(issue.message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(issue.recoverySuggestion)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 12) {
+                Button("Try again", action: onRefresh)
+                    .buttonStyle(.link)
+
+                if canShowDiagnostics {
+                    Button("View diagnostics", action: onShowDiagnostics)
+                        .buttonStyle(.link)
+                }
+            }
+            .font(.caption)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
+    }
+}
+
+private struct DiagnosticsSheet: View {
+    let snapshot: UsageSnapshot
+    let appVersion: String
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(snapshot.provider.displayName) diagnostics")
+                        .font(.headline)
+                    Text("Safe to include in a bug report")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button("Done") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+            }
+
+            ScrollView {
+                Text(report)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+            }
+            .background(
+                Color(nsColor: .textBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+
+            HStack {
+                Button(copied ? "Copied" : "Copy diagnostic report") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(report, forType: .string)
+                    copied = true
+                }
+
+                Link(
+                    "Report issue",
+                    destination: URL(string: "https://github.com/geraldooi/quotapeek/issues/new")!
+                )
+
+                Spacer()
+            }
+        }
+        .padding(18)
+        .frame(width: 460, height: 340)
+    }
+
+    private var report: String {
+        snapshot.diagnostics?.report(
+            provider: snapshot.provider,
+            health: snapshot.health,
+            issue: snapshot.issue,
+            appVersion: appVersion
+        ) ?? """
+        QuotaPeek \(appVersion)
+        Provider: \(snapshot.provider.displayName)
+        Status: Diagnostics unavailable
+
+        Privacy: This report does not include prompts, responses, credentials, or usernames.
+        """
     }
 }
 
