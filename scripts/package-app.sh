@@ -30,8 +30,8 @@ lipo -create \
     "$BUILD_DIR/x86_64/x86_64-apple-macosx/release/QuotaPeek" \
     -output "$CONTENTS_DIR/MacOS/QuotaPeek"
 cp "$ROOT/packaging/Info.plist" "$CONTENTS_DIR/Info.plist"
-cp "$BRAND_ICON_SOURCE_DIR/codex.svg" "$BRAND_ICON_DEST_DIR/codex.svg"
-cp "$BRAND_ICON_SOURCE_DIR/claude-code.svg" "$BRAND_ICON_DEST_DIR/claude-code.svg"
+cp "$BRAND_ICON_SOURCE_DIR/codex.png" "$BRAND_ICON_DEST_DIR/codex.png"
+cp "$BRAND_ICON_SOURCE_DIR/claude-code.png" "$BRAND_ICON_DEST_DIR/claude-code.png"
 cp "$BRAND_ICON_SOURCE_DIR/NOTICE.md" "$BRAND_ICON_DEST_DIR/NOTICE.md"
 /usr/libexec/PlistBuddy \
     -c "Set :CFBundleShortVersionString $VERSION" \

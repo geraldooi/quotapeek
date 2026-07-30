@@ -138,7 +138,6 @@ private struct ProviderCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
                 ProviderLogo(provider: snapshot.provider)
-                    .foregroundStyle(.primary)
                     .frame(width: 28, height: 28)
 
                 Text(snapshot.provider.displayName)
@@ -345,7 +344,7 @@ private struct ProviderLogo: View {
         if let image = logoImage {
             Image(nsImage: image)
                 .resizable()
-                .renderingMode(.template)
+                .renderingMode(.original)
                 .scaledToFit()
                 .frame(width: 28, height: 28)
                 .accessibilityHidden(true)
@@ -356,13 +355,13 @@ private struct ProviderLogo: View {
         let resourceName = provider == .codex ? "codex" : "claude-code"
         guard let url = Bundle.main.url(
             forResource: resourceName,
-            withExtension: "svg",
+            withExtension: "png",
             subdirectory: "BrandIcons"
         ) ?? Bundle.module.url(
             forResource: resourceName,
-            withExtension: "svg",
+            withExtension: "png",
             subdirectory: "BrandIcons"
-        ) ?? Bundle.module.url(forResource: resourceName, withExtension: "svg") else {
+        ) ?? Bundle.module.url(forResource: resourceName, withExtension: "png") else {
             return nil
         }
         return NSImage(contentsOf: url)

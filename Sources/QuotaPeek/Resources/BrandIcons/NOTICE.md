@@ -1,6 +1,6 @@
 # Brand icon notice
 
-The Codex and Claude Code SVG assets are sourced from Lobe Icons 1.94.0:
+The Codex and Claude Code PNG assets are sourced from Lobe Icons 1.94.0:
 https://github.com/lobehub/lobe-icons
 
 Codex is a trademark of OpenAI. Claude Code is a trademark of Anthropic.
