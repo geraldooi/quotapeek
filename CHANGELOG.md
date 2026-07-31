@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.6.0](https://github.com/geraldooi/quotapeek/compare/v0.5.0...v0.6.0) (2026-07-31)
+
+
+### Features
+
+* **accessibility:** respect Reduce Motion and VoiceOver ([#27](https://github.com/geraldooi/quotapeek/issues/27)) ([40bb642](https://github.com/geraldooi/quotapeek/commit/40bb642aa5e59440b6872ca9d9a5083cc3bf0da5))
+* **menu-bar:** add configurable usage summary ([#26](https://github.com/geraldooi/quotapeek/issues/26)) ([6dad412](https://github.com/geraldooi/quotapeek/commit/6dad41206e05799b5b454bafb509cd05c4e1ed23))
+* **preferences:** add provider visibility controls ([#23](https://github.com/geraldooi/quotapeek/issues/23)) ([c72a5ad](https://github.com/geraldooi/quotapeek/commit/c72a5ad6b29422674f171d97049e39ae0f4b6071))
+* **update:** add release awareness ([#25](https://github.com/geraldooi/quotapeek/issues/25)) ([85a068c](https://github.com/geraldooi/quotapeek/commit/85a068c02d77da59098f46e34f9b9968a7c626be))
+* **usage:** add neutral inactive state ([#22](https://github.com/geraldooi/quotapeek/issues/22)) ([f63333d](https://github.com/geraldooi/quotapeek/commit/f63333ddfcea76a5ec8462389177b039d582dd51))
+
+
+### Bug Fixes
+
+* **ui:** clarify Codex reset forecast wording ([#24](https://github.com/geraldooi/quotapeek/issues/24)) ([e4e7580](https://github.com/geraldooi/quotapeek/commit/e4e75801fd56970264abbc31d7451c157c81dc61))
+* **ui:** render provider logos from color PNGs ([#21](https://github.com/geraldooi/quotapeek/issues/21)) ([5fd478a](https://github.com/geraldooi/quotapeek/commit/5fd478a475f20055fab91cd531f4d1e144d5e5f3))
+* **ui:** use primary LobeHub provider logos ([#20](https://github.com/geraldooi/quotapeek/issues/20)) ([395b0e6](https://github.com/geraldooi/quotapeek/commit/395b0e60df107bb9f41f9e786a1ad226d4681419))
+* **usage:** add actionable recovery states ([#18](https://github.com/geraldooi/quotapeek/issues/18)) ([62d1c5b](https://github.com/geraldooi/quotapeek/commit/62d1c5bd1d288dddd07e6800f50ab23ddb8e45ce))
+
 ## [0.5.0](https://github.com/geraldooi/quotapeek/compare/v0.4.2...v0.5.0) (2026-07-24)
 
 
