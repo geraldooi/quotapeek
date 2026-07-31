@@ -15,20 +15,24 @@ struct UsagePopover: View {
 
             ScrollView {
                 VStack(spacing: 12) {
-                    ProviderCard(
-                        snapshot: state.codex,
-                        tint: .blue,
-                        resetForecast: state.codexResetForecast,
-                        appVersion: versionLabel,
-                        onRefresh: { state.refresh() }
-                    )
-                    ProviderCard(
-                        snapshot: state.claude,
-                        tint: .orange,
-                        resetForecast: nil,
-                        appVersion: versionLabel,
-                        onRefresh: { state.refresh() }
-                    )
+                    if state.providerVisibility.showsCodex {
+                        ProviderCard(
+                            snapshot: state.codex,
+                            tint: .blue,
+                            resetForecast: state.codexResetForecast,
+                            appVersion: versionLabel,
+                            onRefresh: { state.refresh() }
+                        )
+                    }
+                    if state.providerVisibility.showsClaude {
+                        ProviderCard(
+                            snapshot: state.claude,
+                            tint: .orange,
+                            resetForecast: nil,
+                            appVersion: versionLabel,
+                            onRefresh: { state.refresh() }
+                        )
+                    }
                 }
                 .padding(14)
             }
@@ -47,7 +51,7 @@ struct UsagePopover: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Token usage")
                     .font(.headline)
-                Text("Codex and Claude Code")
+                Text(state.providerVisibility.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(state.refreshSummary)
@@ -79,7 +83,7 @@ struct UsagePopover: View {
         if state.isRefreshing {
             return .secondary
         }
-        return state.codex.needsAttention || state.claude.needsAttention ? .orange : .secondary
+        return state.visibleSnapshots.contains(where: \.needsAttention) ? .orange : .secondary
     }
 
     private var footer: some View {
@@ -101,6 +105,18 @@ struct UsagePopover: View {
                 .accessibilityLabel("QuotaPeek version \(versionLabel)")
                 .fixedSize()
 
+            Menu {
+                providerToggle(.codex)
+                providerToggle(.claude)
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Choose visible providers")
+            .accessibilityLabel("Choose visible providers")
+
             Button("Quit") {
                 state.quit()
             }
@@ -111,6 +127,18 @@ struct UsagePopover: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 42)
+    }
+
+    private func providerToggle(_ provider: Provider) -> some View {
+        let isVisible = state.providerVisibility.contains(provider)
+        return Toggle(
+            provider.displayName,
+            isOn: Binding(
+                get: { state.providerVisibility.contains(provider) },
+                set: { state.setProvider(provider, isVisible: $0) }
+            )
+        )
+        .disabled(state.isRefreshing || (isVisible && state.providerVisibility.visibleProviders.count == 1))
     }
 
     private var versionLabel: String {
