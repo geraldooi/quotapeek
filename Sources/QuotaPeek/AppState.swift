@@ -48,7 +48,11 @@ final class AppState: ObservableObject {
         let attentionCount = [codex, claude].filter(\.needsAttention).count
         switch attentionCount {
         case 0:
-            return lastRefreshWasManual ? "Usage refreshed" : "All usage sources are working"
+            if lastRefreshWasManual {
+                return "Usage refreshed"
+            }
+            let hasInactiveSource = [codex, claude].contains { $0.health == .inactive }
+            return hasInactiveSource ? "Usage sources checked" : "All usage sources are working"
         case 1:
             return lastRefreshWasManual
                 ? "Refreshed · 1 usage source needs attention"

@@ -143,6 +143,67 @@ struct CodexUsageParserTests {
         #expect(snapshot.diagnostics?.dataPath.contains("~/.codex") == true)
     }
 
+    @Test("Reader treats an empty Codex data folder as inactive")
+    func readerTreatsEmptyDataFolderAsInactive() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        let sessions = root
+            .appendingPathComponent(".codex")
+            .appendingPathComponent("sessions")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = CodexUsageReader(homeDirectory: root).load()
+
+        #expect(snapshot.health == .inactive)
+        #expect(!snapshot.needsAttention)
+        #expect(snapshot.issue?.kind == .noRecentActivity)
+    }
+
+    @Test("Reader treats an empty Codex session file as inactive")
+    func readerTreatsEmptySessionFileAsInactive() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        let sessions = root
+            .appendingPathComponent(".codex")
+            .appendingPathComponent("sessions")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "".write(
+            to: sessions.appendingPathComponent("empty.jsonl"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let snapshot = CodexUsageReader(homeDirectory: root).load()
+
+        #expect(snapshot.health == .inactive)
+        #expect(!snapshot.needsAttention)
+        #expect(snapshot.issue?.kind == .noRecentActivity)
+    }
+
+    @Test("Reader keeps unrecognized Codex records as needing attention")
+    func readerKeepsUnrecognizedRecordsAsNeedingAttention() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        let sessions = root
+            .appendingPathComponent(".codex")
+            .appendingPathComponent("sessions")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "{}".write(
+            to: sessions.appendingPathComponent("unknown.jsonl"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let snapshot = CodexUsageReader(homeDirectory: root).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.needsAttention)
+        #expect(snapshot.issue?.kind == .unsupportedFormat)
+    }
+
     private func codexLine(timestamp: String, usedPercent: Double) -> String {
         #"{"timestamp":"\#(timestamp)","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":100}},"rate_limits":{"primary":{"used_percent":\#(usedPercent),"window_minutes":300,"resets_at":1784196000}}}}"#
     }

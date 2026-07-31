@@ -175,9 +175,10 @@ public struct CodexUsageReader {
 
         guard !files.isEmpty else {
             let diagnostics = UsageDiagnostics(dataPath: displayPath)
-            if enumerationPermissionFailures > 0 || enumerationOtherFailures > 0 {
-                let permissionDenied = enumerationPermissionFailures > 0
-                    && enumerationOtherFailures == 0
+            let permissionFailures = directoryPermissionFailures + enumerationPermissionFailures
+            let otherFailures = directoryOtherFailures + enumerationOtherFailures
+            if permissionFailures > 0 || otherFailures > 0 {
+                let permissionDenied = permissionFailures > 0 && otherFailures == 0
                 return unavailable(
                     kind: permissionDenied ? .permissionDenied : .readError,
                     title: permissionDenied
@@ -192,8 +193,7 @@ public struct CodexUsageReader {
                     diagnostics: diagnostics
                 )
             }
-            return unavailable(
-                kind: .noRecentActivity,
+            return inactive(
                 title: "No Codex usage yet",
                 message: "The Codex folder exists, but it does not contain any session records.",
                 recoverySuggestion: "Use Codex once on this Mac, then refresh.",
@@ -302,6 +302,15 @@ public struct CodexUsageReader {
             )
         }
 
+        if recordsScanned == 0 {
+            return inactive(
+                title: "No Codex usage found",
+                message: "Codex session files exist, but they do not contain any activity.",
+                recoverySuggestion: "Use Codex, then refresh QuotaPeek.",
+                diagnostics: diagnostics
+            )
+        }
+
         return unavailable(
             kind: .unsupportedFormat,
             title: "Codex usage format not supported",
@@ -316,6 +325,21 @@ public struct CodexUsageReader {
             let url = root.appendingPathComponent(path)
             return url.pathExtension == "jsonl" ? url : nil
         }
+    }
+
+    private func inactive(
+        title: String,
+        message: String,
+        recoverySuggestion: String,
+        diagnostics: UsageDiagnostics
+    ) -> UsageSnapshot {
+        UsageReaderSupport.inactive(
+            provider: .codex,
+            title: title,
+            message: message,
+            recoverySuggestion: recoverySuggestion,
+            diagnostics: diagnostics
+        )
     }
 
     private func unavailable(
