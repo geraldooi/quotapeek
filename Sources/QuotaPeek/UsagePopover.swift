@@ -451,14 +451,11 @@ private struct UsageWindowRow: View {
                             Text(UsageFormatting.reset(resetAt))
 
                             if let resetForecast {
-                                (
-                                    Text("\(resetForecast.score)%").fontWeight(.medium)
-                                    + Text(" chance · next 48h")
-                                )
-                                .help("Unofficial estimate from willcodexquotareset.com")
-                                .accessibilityLabel(
-                                    "\(resetForecast.score) percent chance of a Codex reset in the next 48 hours"
-                                )
+                                Text(resetForecast.compactLabel)
+                                    .help(
+                                        "Transparent heuristic from willcodexquotareset.com, not an official OpenAI forecast"
+                                    )
+                                    .accessibilityLabel(resetForecast.accessibilityLabel)
                             }
                         }
                     }
