@@ -175,9 +175,10 @@ public struct CodexUsageReader {
 
         guard !files.isEmpty else {
             let diagnostics = UsageDiagnostics(dataPath: displayPath)
-            if enumerationPermissionFailures > 0 || enumerationOtherFailures > 0 {
-                let permissionDenied = enumerationPermissionFailures > 0
-                    && enumerationOtherFailures == 0
+            let permissionFailures = directoryPermissionFailures + enumerationPermissionFailures
+            let otherFailures = directoryOtherFailures + enumerationOtherFailures
+            if permissionFailures > 0 || otherFailures > 0 {
+                let permissionDenied = permissionFailures > 0 && otherFailures == 0
                 return unavailable(
                     kind: permissionDenied ? .permissionDenied : .readError,
                     title: permissionDenied
