@@ -8,6 +8,7 @@ final class AppState: ObservableObject {
     @Published private(set) var codex = UsageSnapshot.loading(.codex)
     @Published private(set) var claude = UsageSnapshot.loading(.claude)
     @Published private(set) var codexResetForecast: CodexResetForecast?
+    @Published private(set) var availableUpdate: AppRelease?
     @Published private(set) var providerVisibility: ProviderVisibility
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastRefresh: Date?
@@ -15,6 +16,7 @@ final class AppState: ObservableObject {
 
     private var timer: AnyCancellable?
     private var forecastRefreshAfter = Date.distantPast
+    private var releaseRefreshAfter = Date.distantPast
     private let defaults: UserDefaults
 
     private enum PreferenceKey {
@@ -89,11 +91,18 @@ final class AppState: ObservableObject {
         isRefreshing = true
         let visibility = providerVisibility
         let shouldRefreshForecast = Date() >= forecastRefreshAfter
+        let currentVersion = AppVersion.current
+        let shouldRefreshRelease = currentVersion != nil && Date() >= releaseRefreshAfter
 
         Task {
             let forecastTask = visibility.showsCodex && shouldRefreshForecast
                 ? Task.detached(priority: .utility) {
                     await CodexResetForecastReader().load()
+                }
+                : nil
+            let releaseTask: Task<AppRelease?, Never>? = shouldRefreshRelease
+                ? Task.detached(priority: .utility) {
+                    await AppReleaseReader().load()
                 }
                 : nil
             let result = await Task.detached(priority: .utility) {
@@ -127,6 +136,18 @@ final class AppState: ObservableObject {
                        Date().timeIntervalSince(current.fetchedAt) > 2 * 60 * 60 {
                         codexResetForecast = nil
                     }
+                }
+            }
+
+            if let releaseTask {
+                let now = Date()
+                if let release = await releaseTask.value {
+                    availableUpdate = currentVersion.map { release.isNewer(than: $0) } == true
+                        ? release
+                        : nil
+                    releaseRefreshAfter = now.addingTimeInterval(6 * 60 * 60)
+                } else {
+                    releaseRefreshAfter = now.addingTimeInterval(30 * 60)
                 }
             }
 
