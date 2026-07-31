@@ -94,15 +94,14 @@ final class AppState: ObservableObject {
         let currentVersion = AppVersion.current
         let shouldRefreshRelease = currentVersion != nil && Date() >= releaseRefreshAfter
 
+        if shouldRefreshRelease, let currentVersion {
+            refreshRelease(currentVersion: currentVersion)
+        }
+
         Task {
             let forecastTask = visibility.showsCodex && shouldRefreshForecast
                 ? Task.detached(priority: .utility) {
                     await CodexResetForecastReader().load()
-                }
-                : nil
-            let releaseTask: Task<AppRelease?, Never>? = shouldRefreshRelease
-                ? Task.detached(priority: .utility) {
-                    await AppReleaseReader().load()
                 }
                 : nil
             let result = await Task.detached(priority: .utility) {
@@ -139,24 +138,26 @@ final class AppState: ObservableObject {
                 }
             }
 
-            if let releaseTask {
-                let now = Date()
-                if let release = await releaseTask.value {
-                    availableUpdate = currentVersion.map { release.isNewer(than: $0) } == true
-                        ? release
-                        : nil
-                    releaseRefreshAfter = now.addingTimeInterval(6 * 60 * 60)
-                } else {
-                    releaseRefreshAfter = now.addingTimeInterval(30 * 60)
-                }
-            }
-
             lastRefresh = Date()
             isRefreshing = false
             lastRefreshWasManual = announcesCompletion
             if announcesCompletion {
                 announceRefreshCompletion()
             }
+        }
+    }
+
+    private func refreshRelease(currentVersion: String) {
+        releaseRefreshAfter = Date().addingTimeInterval(30 * 60)
+
+        Task {
+            let release = await Task.detached(priority: .utility) {
+                await AppReleaseReader().load()
+            }.value
+            guard let release else { return }
+
+            availableUpdate = release.isNewer(than: currentVersion) ? release : nil
+            releaseRefreshAfter = Date().addingTimeInterval(6 * 60 * 60)
         }
     }
 
