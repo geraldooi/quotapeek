@@ -52,22 +52,11 @@ final class AppState: ObservableObject {
     }
 
     var menuBarText: String? {
-        var parts: [String] = []
-        for provider in menuBarSummaryMode.providers(in: providerVisibility) {
-            switch provider {
-            case .codex:
-                if let used = codex.windows.first?.usedPercent {
-                    parts.append("C \(Int(used.rounded()))%")
-                } else if let tokens = codex.windows.first?.tokens {
-                    parts.append("C \(UsageFormatting.tokens(tokens))")
-                }
-            case .claude:
-                if let tokens = claude.windows.first?.tokens {
-                    parts.append("A \(UsageFormatting.tokens(tokens))")
-                }
-            }
-        }
-        return parts.isEmpty ? menuBarSummaryMode.fallbackText : parts.joined(separator: " · ")
+        menuBarSummaryMode.summaryText(
+            visibility: providerVisibility,
+            codex: codex,
+            claude: claude
+        )
     }
 
     var visibleSnapshots: [UsageSnapshot] {

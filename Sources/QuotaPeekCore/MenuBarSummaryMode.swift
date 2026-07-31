@@ -6,19 +6,10 @@ public enum MenuBarSummaryMode: String, CaseIterable, Equatable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .visibleProviders: "Visible providers"
+        case .visibleProviders: "All visible providers"
         case .codexOnly: "Codex only"
         case .claudeOnly: "Claude Code only"
         case .iconOnly: "Icon only"
-        }
-    }
-
-    public var fallbackText: String? {
-        switch self {
-        case .visibleProviders: "Tokens"
-        case .codexOnly: "Codex"
-        case .claudeOnly: "Claude"
-        case .iconOnly: nil
         }
     }
 
@@ -33,5 +24,28 @@ public enum MenuBarSummaryMode: String, CaseIterable, Equatable, Sendable {
         case .iconOnly:
             []
         }
+    }
+
+    public func summaryText(
+        visibility: ProviderVisibility,
+        codex: UsageSnapshot,
+        claude: UsageSnapshot
+    ) -> String? {
+        let selectedProviders = providers(in: visibility)
+        guard !selectedProviders.isEmpty else { return nil }
+
+        return selectedProviders.map { provider in
+            let snapshot = provider == .codex ? codex : claude
+            let prefix = provider == .codex ? "C" : "A"
+
+            if provider == .codex, let used = snapshot.windows.first?.usedPercent {
+                return "\(prefix) \(Int(used.rounded()))%"
+            }
+            if let tokens = snapshot.windows.first?.tokens {
+                return "\(prefix) \(UsageFormatting.tokens(tokens))"
+            }
+            return "\(prefix) —"
+        }
+        .joined(separator: " · ")
     }
 }

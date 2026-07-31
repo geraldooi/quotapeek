@@ -16,7 +16,12 @@ struct QuotaPeekApp: App {
     @ViewBuilder
     private var menuBarLabel: some View {
         if let text = state.menuBarText {
-            Label(text, systemImage: "gauge.with.dots.needle.67percent")
+            HStack(spacing: 4) {
+                Image(systemName: "gauge.with.dots.needle.67percent")
+                Text(text)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("QuotaPeek, \(text)")
         } else {
             Image(systemName: "gauge.with.dots.needle.67percent")
                 .accessibilityLabel("QuotaPeek")
