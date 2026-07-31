@@ -11,6 +11,14 @@ public struct CodexResetForecast: Equatable, Sendable {
         self.nextRefreshAt = nextRefreshAt
     }
 
+    public var compactLabel: String {
+        "Unofficial reset chance: \(score)% · 48h"
+    }
+
+    public var accessibilityLabel: String {
+        "Unofficial estimate: \(score) percent chance of a Codex quota reset in the next 48 hours"
+    }
+
     public func isFresh(
         at date: Date = Date(),
         maxAge: TimeInterval = 2 * 60 * 60

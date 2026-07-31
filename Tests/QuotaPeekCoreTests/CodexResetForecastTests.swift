@@ -78,4 +78,15 @@ struct CodexResetForecastTests {
         #expect(!stale.isFresh(at: now))
         #expect(!future.isFresh(at: now))
     }
+
+    @Test("Clearly labels the forecast as unofficial")
+    func labelsForecastAsUnofficial() {
+        let forecast = CodexResetForecast(score: 53, fetchedAt: Date())
+
+        #expect(forecast.compactLabel == "Unofficial reset chance: 53% · 48h")
+        #expect(
+            forecast.accessibilityLabel
+                == "Unofficial estimate: 53 percent chance of a Codex quota reset in the next 48 hours"
+        )
+    }
 }
