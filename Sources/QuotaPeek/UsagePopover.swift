@@ -63,24 +63,67 @@ struct UsagePopover: View {
 
             Spacer()
 
-            Button {
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.6)) {
-                    refreshRotation += 360
+            HStack(spacing: 4) {
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.6)) {
+                        refreshRotation += 360
+                    }
+                    state.refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .frame(width: 18, height: 18)
+                        .rotationEffect(.degrees(refreshRotation))
+                        .frame(width: 28, height: 28)
                 }
-                state.refresh()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .frame(width: 18, height: 18)
-                    .rotationEffect(.degrees(refreshRotation))
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .help("Refresh usage")
+                .accessibilityLabel(
+                    state.isRefreshing ? "Refreshing token usage" : "Refresh token usage"
+                )
+                .disabled(state.isRefreshing)
+
+                settingsMenu
             }
-            .buttonStyle(.plain)
-            .help("Refresh usage")
-            .accessibilityLabel(
-                state.isRefreshing ? "Refreshing token usage" : "Refresh token usage"
-            )
-            .disabled(state.isRefreshing)
         }
         .padding(16)
+    }
+
+    private var settingsMenu: some View {
+        Menu {
+            Section("Providers") {
+                providerToggle(.codex)
+                providerToggle(.claude)
+            }
+
+            Section("Menu bar summary") {
+                Picker(
+                    "Menu bar summary",
+                    selection: Binding(
+                        get: { state.menuBarSummaryMode },
+                        set: { state.setMenuBarSummaryMode($0) }
+                    )
+                ) {
+                    ForEach(MenuBarSummaryMode.allCases, id: \.rawValue) { mode in
+                        Text(mode.displayName)
+                            .tag(mode)
+                            .disabled(!state.isMenuBarSummaryModeAvailable(mode))
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.inline)
+            }
+        } label: {
+            Image(systemName: "gearshape")
+                .frame(width: 18, height: 18)
+                .frame(width: 28, height: 28)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .contentShape(Rectangle())
+        .help("Settings")
+        .accessibilityLabel("QuotaPeek settings")
     }
 
     private var summaryColor: Color {
@@ -121,37 +164,6 @@ struct UsagePopover: View {
                     "Update available: QuotaPeek version \(update.version). Open the release page"
                 )
             }
-
-            Menu {
-                Section("Providers") {
-                    providerToggle(.codex)
-                    providerToggle(.claude)
-                }
-
-                Divider()
-
-                Menu("Menu bar summary") {
-                    ForEach(MenuBarSummaryMode.allCases, id: \.rawValue) { mode in
-                        Button {
-                            state.setMenuBarSummaryMode(mode)
-                        } label: {
-                            if state.menuBarSummaryMode == mode {
-                                Label(mode.displayName, systemImage: "checkmark")
-                            } else {
-                                Text(mode.displayName)
-                            }
-                        }
-                        .disabled(!state.isMenuBarSummaryModeAvailable(mode))
-                    }
-                }
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Customize providers and menu-bar summary")
-            .accessibilityLabel("Customize QuotaPeek")
 
             Button("Quit") {
                 state.quit()
