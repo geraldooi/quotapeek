@@ -15,6 +15,7 @@ public enum Provider: String, Equatable, Sendable {
 public enum UsageHealth: Equatable, Sendable {
     case loading
     case ready
+    case inactive
     case limited
     case needsAttention
 }
@@ -81,6 +82,7 @@ public struct UsageDiagnostics: Equatable, Sendable {
         switch health {
         case .loading: status = "Loading"
         case .ready: status = "Working"
+        case .inactive: status = "Inactive"
         case .limited: status = "Limited"
         case .needsAttention: status = "Needs attention"
         }

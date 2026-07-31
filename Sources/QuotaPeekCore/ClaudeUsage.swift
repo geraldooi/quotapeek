@@ -41,7 +41,16 @@ public enum ClaudeUsageParser {
 
         guard !seenMessageIDs.isEmpty else {
             if lines.isEmpty {
-                return .unavailable(.claude, message: "No Claude Code usage found")
+                return UsageSnapshot(
+                    provider: .claude,
+                    health: .inactive,
+                    issue: UsageIssue(
+                        kind: .noRecentActivity,
+                        title: "No Claude Code usage found",
+                        message: "Claude Code usage data exists, but it does not contain any activity.",
+                        recoverySuggestion: "Use Claude Code, then refresh QuotaPeek."
+                    )
+                )
             }
             return UsageSnapshot(
                 provider: .claude,
@@ -62,7 +71,7 @@ public enum ClaudeUsageParser {
         guard activeRecordCount > 0 else {
             return UsageSnapshot(
                 provider: .claude,
-                health: .needsAttention,
+                health: .inactive,
                 issue: UsageIssue(
                     kind: .noRecentActivity,
                     title: "No recent Claude Code activity",
@@ -213,8 +222,7 @@ public struct ClaudeUsageReader {
         let latestActivity = files.compactMap(\.1).max()
 
         guard !files.isEmpty else {
-            return unavailable(
-                kind: .noRecentActivity,
+            return inactive(
                 title: "No Claude Code usage yet",
                 message: "The Claude Code folder exists, but it does not contain any project records.",
                 recoverySuggestion: "Use Claude Code once on this Mac, then refresh.",
@@ -226,8 +234,7 @@ public struct ClaudeUsageReader {
             modifiedAt.1 == nil || modifiedAt.1! >= cutoff
         }
         guard !recentFiles.isEmpty else {
-            return unavailable(
-                kind: .noRecentActivity,
+            return inactive(
                 title: "No recent Claude Code activity",
                 message: "Claude Code data was found, but none of it was updated recently.",
                 recoverySuggestion: "Use Claude Code, then refresh QuotaPeek.",
@@ -316,6 +323,21 @@ public struct ClaudeUsageReader {
         }
 
         return snapshot.attaching(diagnostics: diagnostics)
+    }
+
+    private func inactive(
+        title: String,
+        message: String,
+        recoverySuggestion: String,
+        diagnostics: UsageDiagnostics
+    ) -> UsageSnapshot {
+        UsageReaderSupport.inactive(
+            provider: .claude,
+            title: title,
+            message: message,
+            recoverySuggestion: recoverySuggestion,
+            diagnostics: diagnostics
+        )
     }
 
     private func unavailable(

@@ -205,6 +205,7 @@ private struct ProviderStatusBadge: View {
         switch health {
         case .loading: "Loading"
         case .ready: "Working"
+        case .inactive: "Inactive"
         case .limited: "Limited"
         case .needsAttention: "Needs attention"
         }
@@ -214,13 +215,14 @@ private struct ProviderStatusBadge: View {
         switch health {
         case .loading: "ellipsis.circle"
         case .ready: "checkmark.circle.fill"
+        case .inactive: "minus.circle.fill"
         case .limited, .needsAttention: "exclamationmark.triangle.fill"
         }
     }
 
     private var color: Color {
         switch health {
-        case .loading: .secondary
+        case .loading, .inactive: .secondary
         case .ready: .green
         case .limited, .needsAttention: .orange
         }
@@ -235,9 +237,9 @@ private struct UsageIssueView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(issue.title, systemImage: "exclamationmark.triangle.fill")
+            Label(issue.title, systemImage: icon)
                 .font(.callout.weight(.semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(accentColor)
 
             Text(issue.message)
                 .font(.caption)
@@ -260,7 +262,23 @@ private struct UsageIssueView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
+        .background(backgroundColor, in: RoundedRectangle(cornerRadius: 9))
+    }
+
+    private var isInactive: Bool {
+        issue.kind == .noRecentActivity
+    }
+
+    private var icon: String {
+        isInactive ? "clock.fill" : "exclamationmark.triangle.fill"
+    }
+
+    private var accentColor: Color {
+        isInactive ? .secondary : .orange
+    }
+
+    private var backgroundColor: Color {
+        isInactive ? Color.secondary.opacity(0.08) : Color.orange.opacity(0.08)
     }
 }
 

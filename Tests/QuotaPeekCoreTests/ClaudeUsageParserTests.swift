@@ -29,12 +29,24 @@ struct ClaudeUsageParserTests {
         #expect(snapshot.tokens.total == 440)
     }
 
-    @Test("Returns unavailable when no usage exists")
-    func returnsUnavailableSnapshotWhenNoUsageExists() {
+    @Test("Returns inactive when no usage exists")
+    func returnsInactiveSnapshotWhenNoUsageExists() {
         let snapshot = ClaudeUsageParser.aggregate(lines: [], now: Date())
 
         #expect(!snapshot.isAvailable)
+        #expect(snapshot.health == .inactive)
+        #expect(!snapshot.needsAttention)
+        #expect(snapshot.issue?.kind == .noRecentActivity)
         #expect(snapshot.statusMessage == "No Claude Code usage found")
+    }
+
+    @Test("Keeps unrecognized Claude Code records as needing attention")
+    func keepsUnrecognizedRecordsAsNeedingAttention() {
+        let snapshot = ClaudeUsageParser.aggregate(lines: ["{}"], now: Date())
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.needsAttention)
+        #expect(snapshot.issue?.kind == .unsupportedFormat)
     }
 
     @Test("Returns no recent activity when readable records are outside display windows")
@@ -56,7 +68,8 @@ struct ClaudeUsageParserTests {
             calendar: utcCalendar
         )
 
-        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.health == .inactive)
+        #expect(!snapshot.needsAttention)
         #expect(snapshot.issue?.kind == .noRecentActivity)
         #expect(snapshot.updatedAt == ISO8601DateFormatter().date(from: "2026-07-22T11:00:00Z"))
     }
@@ -97,6 +110,66 @@ struct ClaudeUsageParserTests {
         #expect(snapshot.diagnostics?.dataPath == "~/.claude/projects")
     }
 
+    @Test("Reader treats an empty Claude Code data folder as inactive")
+    func readerTreatsEmptyDataFolderAsInactive() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        let projects = root
+            .appendingPathComponent(".claude")
+            .appendingPathComponent("projects")
+        try FileManager.default.createDirectory(at: projects, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeUsageReader(homeDirectory: root).load()
+
+        #expect(snapshot.health == .inactive)
+        #expect(!snapshot.needsAttention)
+        #expect(snapshot.issue?.kind == .noRecentActivity)
+    }
+
+    @Test("Reader treats stale Claude Code project files as inactive")
+    func readerTreatsStaleProjectFilesAsInactive() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        let projects = root
+            .appendingPathComponent(".claude")
+            .appendingPathComponent("projects")
+        try FileManager.default.createDirectory(at: projects, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let file = projects.appendingPathComponent("old.jsonl")
+        try "{}".write(to: file, atomically: true, encoding: .utf8)
+        let now = try #require(ISO8601DateFormatter().date(from: "2026-07-24T12:00:00Z"))
+        let oldDate = try #require(ISO8601DateFormatter().date(from: "2026-07-20T12:00:00Z"))
+        try FileManager.default.setAttributes([.modificationDate: oldDate], ofItemAtPath: file.path)
+
+        let snapshot = ClaudeUsageReader(homeDirectory: root).load(now: now)
+
+        #expect(snapshot.health == .inactive)
+        #expect(!snapshot.needsAttention)
+        #expect(snapshot.issue?.kind == .noRecentActivity)
+    }
+
+    @Test("Reader keeps permission failures as needing attention")
+    func readerKeepsPermissionFailuresAsNeedingAttention() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        let projects = root
+            .appendingPathComponent(".claude")
+            .appendingPathComponent("projects")
+        try FileManager.default.createDirectory(at: projects, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeUsageReader(
+            homeDirectory: root,
+            fileManager: PermissionDeniedFileManager()
+        ).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.needsAttention)
+        #expect(snapshot.issue?.kind == .permissionDenied)
+    }
+
     private var utcCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -126,5 +199,11 @@ struct ClaudeUsageParserTests {
           }
         }
         """
+    }
+}
+
+private final class PermissionDeniedFileManager: FileManager, @unchecked Sendable {
+    override func subpathsOfDirectory(atPath path: String) throws -> [String] {
+        throw CocoaError(.fileReadNoPermission)
     }
 }

@@ -40,9 +40,47 @@ enum UsageReaderSupport {
         recoverySuggestion: String,
         diagnostics: UsageDiagnostics
     ) -> UsageSnapshot {
-        UsageSnapshot(
+        snapshot(
             provider: provider,
             health: .needsAttention,
+            kind: kind,
+            title: title,
+            message: message,
+            recoverySuggestion: recoverySuggestion,
+            diagnostics: diagnostics
+        )
+    }
+
+    static func inactive(
+        provider: Provider,
+        title: String,
+        message: String,
+        recoverySuggestion: String,
+        diagnostics: UsageDiagnostics
+    ) -> UsageSnapshot {
+        snapshot(
+            provider: provider,
+            health: .inactive,
+            kind: .noRecentActivity,
+            title: title,
+            message: message,
+            recoverySuggestion: recoverySuggestion,
+            diagnostics: diagnostics
+        )
+    }
+
+    private static func snapshot(
+        provider: Provider,
+        health: UsageHealth,
+        kind: UsageIssueKind,
+        title: String,
+        message: String,
+        recoverySuggestion: String,
+        diagnostics: UsageDiagnostics
+    ) -> UsageSnapshot {
+        UsageSnapshot(
+            provider: provider,
+            health: health,
             issue: UsageIssue(
                 kind: kind,
                 title: title,
