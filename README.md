@@ -9,6 +9,7 @@ A small, native macOS menu-bar app for seeing Codex and Claude Code token usage 
 - A configurable menu-bar summary for all visible providers, one provider, or an icon-only mode.
 - A subtle release-page link when a newer stable QuotaPeek version is available.
 - Actionable recovery states with privacy-safe diagnostics when local usage cannot be read.
+- VoiceOver-friendly usage summaries and refresh motion that respects macOS Reduce Motion.
 - A native SwiftUI popover that refreshes automatically every minute.
 
 QuotaPeek reads usage records locally from:
