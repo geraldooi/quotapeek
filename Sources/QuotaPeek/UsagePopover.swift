@@ -5,6 +5,7 @@ import QuotaPeekCore
 
 struct UsagePopover: View {
     @ObservedObject var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var refreshRotation = 0.0
 
     var body: some View {
@@ -57,12 +58,13 @@ struct UsagePopover: View {
                 Text(state.refreshSummary)
                     .font(.caption2)
                     .foregroundStyle(summaryColor)
+                    .accessibilityLabel("Status: \(state.refreshSummary)")
             }
 
             Spacer()
 
             Button {
-                withAnimation(.easeInOut(duration: 0.6)) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.6)) {
                     refreshRotation += 360
                 }
                 state.refresh()
@@ -73,7 +75,9 @@ struct UsagePopover: View {
             }
             .buttonStyle(.plain)
             .help("Refresh usage")
-            .accessibilityLabel("Refresh token usage")
+            .accessibilityLabel(
+                state.isRefreshing ? "Refreshing token usage" : "Refresh token usage"
+            )
             .disabled(state.isRefreshing)
         }
         .padding(16)
@@ -98,6 +102,7 @@ struct UsagePopover: View {
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
 
             Text(versionLabel)
                 .font(.caption2)
@@ -145,8 +150,8 @@ struct UsagePopover: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Choose visible providers")
-            .accessibilityLabel("Choose visible providers")
+            .help("Customize providers and menu-bar summary")
+            .accessibilityLabel("Customize QuotaPeek")
 
             Button("Quit") {
                 state.quit()
@@ -197,16 +202,20 @@ private struct ProviderCard: View {
 
                 Spacer()
 
-                ProviderStatusBadge(health: snapshot.health)
+                ProviderStatusBadge(provider: snapshot.provider, health: snapshot.health)
             }
 
             if snapshot.health == .loading {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
+                        .accessibilityHidden(true)
                     Text("Checking local usage…")
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                        .accessibilityLabel(
+                            "Checking \(snapshot.provider.displayName) local usage"
+                        )
                 }
                 .padding(.vertical, 8)
             } else {
@@ -220,6 +229,7 @@ private struct ProviderCard: View {
 
                 if let issue = snapshot.issue {
                     UsageIssueView(
+                        provider: snapshot.provider,
                         issue: issue,
                         canShowDiagnostics: snapshot.diagnostics != nil,
                         onRefresh: onRefresh,
@@ -244,13 +254,14 @@ private struct ProviderCard: View {
 }
 
 private struct ProviderStatusBadge: View {
+    let provider: Provider
     let health: UsageHealth
 
     var body: some View {
         Label(label, systemImage: icon)
             .font(.caption2.weight(.medium))
             .foregroundStyle(color)
-            .accessibilityLabel(label)
+            .accessibilityLabel("\(provider.displayName) status: \(label)")
     }
 
     private var label: String {
@@ -282,6 +293,7 @@ private struct ProviderStatusBadge: View {
 }
 
 private struct UsageIssueView: View {
+    let provider: Provider
     let issue: UsageIssue
     let canShowDiagnostics: Bool
     let onRefresh: () -> Void
@@ -304,10 +316,12 @@ private struct UsageIssueView: View {
             HStack(spacing: 12) {
                 Button("Try again", action: onRefresh)
                     .buttonStyle(.link)
+                    .accessibilityLabel("Try \(provider.displayName) again")
 
                 if canShowDiagnostics {
                     Button("View diagnostics", action: onShowDiagnostics)
                         .buttonStyle(.link)
+                        .accessibilityLabel("View \(provider.displayName) diagnostics")
                 }
             }
             .font(.caption)
@@ -464,6 +478,7 @@ private struct UsageWindowRow: View {
             if let used = window.usedPercent {
                 ProgressView(value: used, total: 100)
                     .tint(progressTint(for: used))
+                    .accessibilityHidden(true)
 
                 HStack {
                     if let remaining = window.remainingPercent {
@@ -488,6 +503,27 @@ private struct UsageWindowRow: View {
                 .foregroundStyle(.secondary)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilitySummary)
+    }
+
+    private var accessibilitySummary: String {
+        var parts = [window.label]
+        if let used = window.usedPercent {
+            parts.append("\(UsageFormatting.percent(used)) used")
+        } else if let tokens = window.tokens {
+            parts.append("\(UsageFormatting.tokens(tokens)) tokens")
+        }
+        if let remaining = window.remainingPercent {
+            parts.append("\(UsageFormatting.percent(remaining)) remaining")
+        }
+        if let resetAt = window.resetAt {
+            parts.append(UsageFormatting.reset(resetAt))
+        }
+        if let resetForecast {
+            parts.append(resetForecast.accessibilityLabel)
+        }
+        return parts.joined(separator: ", ")
     }
 
     private func progressTint(for used: Double) -> Color {
