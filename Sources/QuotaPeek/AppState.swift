@@ -156,6 +156,7 @@ final class AppState: ObservableObject {
         }
         if !updated.showsCodex {
             codexResetForecast = nil
+            forecastRefreshAfter = .distantPast
         }
         refresh(announcesCompletion: false)
     }
