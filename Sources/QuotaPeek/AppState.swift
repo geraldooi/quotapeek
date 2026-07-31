@@ -10,6 +10,7 @@ final class AppState: ObservableObject {
     @Published private(set) var codexResetForecast: CodexResetForecast?
     @Published private(set) var availableUpdate: AppRelease?
     @Published private(set) var providerVisibility: ProviderVisibility
+    @Published private(set) var menuBarSummaryMode: MenuBarSummaryMode
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastRefresh: Date?
     @Published private(set) var lastRefreshWasManual = false
@@ -22,6 +23,7 @@ final class AppState: ObservableObject {
     private enum PreferenceKey {
         static let showsCodex = "providerVisibility.codex"
         static let showsClaude = "providerVisibility.claude"
+        static let menuBarSummaryMode = "menuBarSummaryMode"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -30,6 +32,17 @@ final class AppState: ObservableObject {
             showsCodex: defaults.object(forKey: PreferenceKey.showsCodex) as? Bool ?? true,
             showsClaude: defaults.object(forKey: PreferenceKey.showsClaude) as? Bool ?? true
         )
+        menuBarSummaryMode = defaults.string(forKey: PreferenceKey.menuBarSummaryMode)
+            .flatMap(MenuBarSummaryMode.init(rawValue:))
+            ?? .visibleProviders
+        if menuBarSummaryMode != .iconOnly,
+           menuBarSummaryMode.providers(in: providerVisibility).isEmpty {
+            menuBarSummaryMode = .visibleProviders
+            defaults.set(
+                MenuBarSummaryMode.visibleProviders.rawValue,
+                forKey: PreferenceKey.menuBarSummaryMode
+            )
+        }
         refresh(announcesCompletion: false)
         timer = Timer.publish(every: 60, on: .main, in: .common)
             .autoconnect()
@@ -38,19 +51,23 @@ final class AppState: ObservableObject {
             }
     }
 
-    var menuBarText: String {
+    var menuBarText: String? {
         var parts: [String] = []
-        if providerVisibility.showsCodex {
-            if let used = codex.windows.first?.usedPercent {
-                parts.append("C \(Int(used.rounded()))%")
-            } else if let tokens = codex.windows.first?.tokens {
-                parts.append("C \(UsageFormatting.tokens(tokens))")
+        for provider in menuBarSummaryMode.providers(in: providerVisibility) {
+            switch provider {
+            case .codex:
+                if let used = codex.windows.first?.usedPercent {
+                    parts.append("C \(Int(used.rounded()))%")
+                } else if let tokens = codex.windows.first?.tokens {
+                    parts.append("C \(UsageFormatting.tokens(tokens))")
+                }
+            case .claude:
+                if let tokens = claude.windows.first?.tokens {
+                    parts.append("A \(UsageFormatting.tokens(tokens))")
+                }
             }
         }
-        if providerVisibility.showsClaude, let tokens = claude.windows.first?.tokens {
-            parts.append("A \(UsageFormatting.tokens(tokens))")
-        }
-        return parts.isEmpty ? "Tokens" : parts.joined(separator: " · ")
+        return parts.isEmpty ? menuBarSummaryMode.fallbackText : parts.joined(separator: " · ")
     }
 
     var visibleSnapshots: [UsageSnapshot] {
@@ -170,6 +187,10 @@ final class AppState: ObservableObject {
         defaults.set(updated.showsCodex, forKey: PreferenceKey.showsCodex)
         defaults.set(updated.showsClaude, forKey: PreferenceKey.showsClaude)
 
+        if !isMenuBarSummaryModeAvailable(menuBarSummaryMode) {
+            setMenuBarSummaryMode(.visibleProviders)
+        }
+
         if !previous.showsCodex, updated.showsCodex {
             codex = .loading(.codex)
         }
@@ -181,6 +202,17 @@ final class AppState: ObservableObject {
             forecastRefreshAfter = .distantPast
         }
         refresh(announcesCompletion: false)
+    }
+
+    func isMenuBarSummaryModeAvailable(_ mode: MenuBarSummaryMode) -> Bool {
+        mode == .iconOnly || !mode.providers(in: providerVisibility).isEmpty
+    }
+
+    func setMenuBarSummaryMode(_ mode: MenuBarSummaryMode) {
+        guard isMenuBarSummaryModeAvailable(mode), mode != menuBarSummaryMode else { return }
+
+        menuBarSummaryMode = mode
+        defaults.set(mode.rawValue, forKey: PreferenceKey.menuBarSummaryMode)
     }
 
     private func announceRefreshCompletion() {
