@@ -118,8 +118,27 @@ struct UsagePopover: View {
             }
 
             Menu {
-                providerToggle(.codex)
-                providerToggle(.claude)
+                Section("Providers") {
+                    providerToggle(.codex)
+                    providerToggle(.claude)
+                }
+
+                Divider()
+
+                Menu("Menu bar summary") {
+                    ForEach(MenuBarSummaryMode.allCases, id: \.rawValue) { mode in
+                        Button {
+                            state.setMenuBarSummaryMode(mode)
+                        } label: {
+                            if state.menuBarSummaryMode == mode {
+                                Label(mode.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(mode.displayName)
+                            }
+                        }
+                        .disabled(!state.isMenuBarSummaryModeAvailable(mode))
+                    }
+                }
             } label: {
                 Image(systemName: "slider.horizontal.3")
             }
