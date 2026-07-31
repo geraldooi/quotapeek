@@ -105,6 +105,18 @@ struct UsagePopover: View {
                 .accessibilityLabel("QuotaPeek version \(versionLabel)")
                 .fixedSize()
 
+            if let update = state.availableUpdate {
+                Link(destination: update.url) {
+                    Label("Update", systemImage: "arrow.down.circle")
+                }
+                .font(.caption2)
+                .fixedSize()
+                .help("QuotaPeek v\(update.version) is available")
+                .accessibilityLabel(
+                    "Update available: QuotaPeek version \(update.version). Open the release page"
+                )
+            }
+
             Menu {
                 providerToggle(.codex)
                 providerToggle(.claude)
@@ -142,14 +154,7 @@ struct UsagePopover: View {
     }
 
     private var versionLabel: String {
-        guard let version = Bundle.main.object(
-            forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String else {
-            return "Development"
-        }
-
-        let trimmedVersion = version.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedVersion.isEmpty ? "Development" : "v\(trimmedVersion)"
+        AppVersion.label
     }
 }
 

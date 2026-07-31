@@ -8,6 +8,7 @@ final class AppState: ObservableObject {
     @Published private(set) var codex = UsageSnapshot.loading(.codex)
     @Published private(set) var claude = UsageSnapshot.loading(.claude)
     @Published private(set) var codexResetForecast: CodexResetForecast?
+    @Published private(set) var availableUpdate: AppRelease?
     @Published private(set) var providerVisibility: ProviderVisibility
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastRefresh: Date?
@@ -15,6 +16,7 @@ final class AppState: ObservableObject {
 
     private var timer: AnyCancellable?
     private var forecastRefreshAfter = Date.distantPast
+    private var releaseRefreshAfter = Date.distantPast
     private let defaults: UserDefaults
 
     private enum PreferenceKey {
@@ -89,6 +91,12 @@ final class AppState: ObservableObject {
         isRefreshing = true
         let visibility = providerVisibility
         let shouldRefreshForecast = Date() >= forecastRefreshAfter
+        let currentVersion = AppVersion.current
+        let shouldRefreshRelease = currentVersion != nil && Date() >= releaseRefreshAfter
+
+        if shouldRefreshRelease, let currentVersion {
+            refreshRelease(currentVersion: currentVersion)
+        }
 
         Task {
             let forecastTask = visibility.showsCodex && shouldRefreshForecast
@@ -136,6 +144,20 @@ final class AppState: ObservableObject {
             if announcesCompletion {
                 announceRefreshCompletion()
             }
+        }
+    }
+
+    private func refreshRelease(currentVersion: String) {
+        releaseRefreshAfter = Date().addingTimeInterval(30 * 60)
+
+        Task {
+            let release = await Task.detached(priority: .utility) {
+                await AppReleaseReader().load()
+            }.value
+            guard let release else { return }
+
+            availableUpdate = release.isNewer(than: currentVersion) ? release : nil
+            releaseRefreshAfter = Date().addingTimeInterval(6 * 60 * 60)
         }
     }
 
