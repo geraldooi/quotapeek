@@ -51,8 +51,8 @@ final class AppState: ObservableObject {
             }
     }
 
-    var menuBarText: String? {
-        menuBarSummaryMode.summaryText(
+    var menuBarItems: [MenuBarSummaryItem] {
+        menuBarSummaryMode.summaryItems(
             visibility: providerVisibility,
             codex: codex,
             claude: claude

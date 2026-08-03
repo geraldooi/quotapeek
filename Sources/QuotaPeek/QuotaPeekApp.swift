@@ -15,16 +15,28 @@ struct QuotaPeekApp: App {
 
     @ViewBuilder
     private var menuBarLabel: some View {
-        if let text = state.menuBarText {
+        if !state.menuBarItems.isEmpty {
             HStack(spacing: 4) {
-                Image(systemName: "gauge.with.dots.needle.67percent")
-                Text(text)
+                ForEach(Array(state.menuBarItems.enumerated()), id: \.offset) { index, item in
+                    if index > 0 {
+                        Text("·")
+                    }
+                    ProviderLogo(provider: item.provider, size: 18)
+                    Text(item.value.displayText)
+                }
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("QuotaPeek, \(text)")
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(menuBarAccessibilityLabel)
         } else {
             Image(systemName: "gauge.with.dots.needle.67percent")
                 .accessibilityLabel("QuotaPeek")
         }
+    }
+
+    private var menuBarAccessibilityLabel: String {
+        let summaries = state.menuBarItems.map {
+            "\($0.provider.displayName) \($0.value.accessibilityText)"
+        }
+        return "QuotaPeek, \(summaries.joined(separator: ", "))"
     }
 }

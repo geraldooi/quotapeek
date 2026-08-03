@@ -3,6 +3,24 @@ import Testing
 
 @Suite("Menu-bar summary mode")
 struct MenuBarSummaryModeTests {
+    @Test("Codex-only summary uses the provider logo instead of a text prefix")
+    func codexOnlyUsesProviderLogo() {
+        let codex = UsageSnapshot(
+            provider: .codex,
+            windows: [UsageWindow(label: "7 days", usedPercent: 9)]
+        )
+
+        #expect(
+            MenuBarSummaryMode.codexOnly.summaryItems(
+                visibility: ProviderVisibility(showsCodex: true, showsClaude: false),
+                codex: codex,
+                claude: .loading(.claude)
+            ) == [MenuBarSummaryItem(provider: .codex, value: .percent(9))]
+        )
+        #expect(MenuBarSummaryValue.percent(9).displayText == "9%")
+        #expect(MenuBarSummaryValue.percent(9).accessibilityText == "9 percent used")
+    }
+
     @Test("Displays every visible provider, including inactive providers")
     func displaysEveryVisibleProvider() {
         let codex = UsageSnapshot(
@@ -12,33 +30,37 @@ struct MenuBarSummaryModeTests {
         let claude = UsageSnapshot(provider: .claude, health: .inactive)
 
         #expect(
-            MenuBarSummaryMode.visibleProviders.summaryText(
+            MenuBarSummaryMode.visibleProviders.summaryItems(
                 visibility: ProviderVisibility(),
                 codex: codex,
                 claude: claude
-            ) == "C 69% · A —"
+            ) == [
+                MenuBarSummaryItem(provider: .codex, value: .percent(69)),
+                MenuBarSummaryItem(provider: .claude, value: .unavailable)
+            ]
         )
         #expect(
-            MenuBarSummaryMode.codexOnly.summaryText(
+            MenuBarSummaryMode.codexOnly.summaryItems(
                 visibility: ProviderVisibility(),
                 codex: codex,
                 claude: claude
-            ) == "C 69%"
+            ) == [MenuBarSummaryItem(provider: .codex, value: .percent(69))]
         )
         #expect(
-            MenuBarSummaryMode.claudeOnly.summaryText(
+            MenuBarSummaryMode.claudeOnly.summaryItems(
                 visibility: ProviderVisibility(),
                 codex: codex,
                 claude: claude
-            ) == "A —"
+            ) == [MenuBarSummaryItem(provider: .claude, value: .unavailable)]
         )
         #expect(
-            MenuBarSummaryMode.iconOnly.summaryText(
+            MenuBarSummaryMode.iconOnly.summaryItems(
                 visibility: ProviderVisibility(),
                 codex: codex,
                 claude: claude
-            ) == nil
+            ).isEmpty
         )
+        #expect(MenuBarSummaryValue.unavailable.accessibilityText == "usage unavailable")
     }
 
     @Test("Formats every menu-bar mode distinctly")
@@ -54,32 +76,35 @@ struct MenuBarSummaryModeTests {
         )
 
         #expect(
-            MenuBarSummaryMode.visibleProviders.summaryText(
+            MenuBarSummaryMode.visibleProviders.summaryItems(
                 visibility: visibility,
                 codex: codex,
                 claude: claude
-            ) == "C 69% · A 12.5K"
+            ) == [
+                MenuBarSummaryItem(provider: .codex, value: .percent(69)),
+                MenuBarSummaryItem(provider: .claude, value: .tokens(12_500))
+            ]
         )
         #expect(
-            MenuBarSummaryMode.codexOnly.summaryText(
+            MenuBarSummaryMode.codexOnly.summaryItems(
                 visibility: visibility,
                 codex: codex,
                 claude: claude
-            ) == "C 69%"
+            ) == [MenuBarSummaryItem(provider: .codex, value: .percent(69))]
         )
         #expect(
-            MenuBarSummaryMode.claudeOnly.summaryText(
+            MenuBarSummaryMode.claudeOnly.summaryItems(
                 visibility: visibility,
                 codex: codex,
                 claude: claude
-            ) == "A 12.5K"
+            ) == [MenuBarSummaryItem(provider: .claude, value: .tokens(12_500))]
         )
         #expect(
-            MenuBarSummaryMode.iconOnly.summaryText(
+            MenuBarSummaryMode.iconOnly.summaryItems(
                 visibility: visibility,
                 codex: codex,
                 claude: claude
-            ) == nil
+            ).isEmpty
         )
     }
 

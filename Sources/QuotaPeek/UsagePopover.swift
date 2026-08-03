@@ -433,37 +433,6 @@ private struct DiagnosticsSheet: View {
     }
 }
 
-private struct ProviderLogo: View {
-    let provider: Provider
-
-    var body: some View {
-        if let image = logoImage {
-            Image(nsImage: image)
-                .resizable()
-                .renderingMode(.original)
-                .scaledToFit()
-                .frame(width: 28, height: 28)
-                .accessibilityHidden(true)
-        }
-    }
-
-    private var logoImage: NSImage? {
-        let resourceName = provider == .codex ? "codex" : "claude-code"
-        guard let url = Bundle.main.url(
-            forResource: resourceName,
-            withExtension: "png",
-            subdirectory: "BrandIcons"
-        ) ?? Bundle.module.url(
-            forResource: resourceName,
-            withExtension: "png",
-            subdirectory: "BrandIcons"
-        ) ?? Bundle.module.url(forResource: resourceName, withExtension: "png") else {
-            return nil
-        }
-        return NSImage(contentsOf: url)
-    }
-}
-
 private struct UsageWindowRow: View {
     let window: UsageWindow
     let tint: Color

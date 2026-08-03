@@ -1,3 +1,35 @@
+public enum MenuBarSummaryValue: Equatable, Sendable {
+    case percent(Int)
+    case tokens(Int)
+    case unavailable
+
+    public var displayText: String {
+        switch self {
+        case let .percent(value): "\(value)%"
+        case let .tokens(value): UsageFormatting.tokens(value)
+        case .unavailable: "—"
+        }
+    }
+
+    public var accessibilityText: String {
+        switch self {
+        case let .percent(value): "\(value) percent used"
+        case let .tokens(value): "\(UsageFormatting.tokens(value)) tokens used"
+        case .unavailable: "usage unavailable"
+        }
+    }
+}
+
+public struct MenuBarSummaryItem: Equatable, Sendable {
+    public let provider: Provider
+    public let value: MenuBarSummaryValue
+
+    public init(provider: Provider, value: MenuBarSummaryValue) {
+        self.provider = provider
+        self.value = value
+    }
+}
+
 public enum MenuBarSummaryMode: String, CaseIterable, Equatable, Sendable {
     case visibleProviders
     case codexOnly
@@ -26,26 +58,24 @@ public enum MenuBarSummaryMode: String, CaseIterable, Equatable, Sendable {
         }
     }
 
-    public func summaryText(
+    public func summaryItems(
         visibility: ProviderVisibility,
         codex: UsageSnapshot,
         claude: UsageSnapshot
-    ) -> String? {
-        let selectedProviders = providers(in: visibility)
-        guard !selectedProviders.isEmpty else { return nil }
-
-        return selectedProviders.map { provider in
+    ) -> [MenuBarSummaryItem] {
+        providers(in: visibility).map { provider in
             let snapshot = provider == .codex ? codex : claude
-            let prefix = provider == .codex ? "C" : "A"
+            let value: MenuBarSummaryValue
 
             if provider == .codex, let used = snapshot.windows.first?.usedPercent {
-                return "\(prefix) \(Int(used.rounded()))%"
+                value = .percent(Int(used.rounded()))
+            } else if let tokens = snapshot.windows.first?.tokens {
+                value = .tokens(tokens)
+            } else {
+                value = .unavailable
             }
-            if let tokens = snapshot.windows.first?.tokens {
-                return "\(prefix) \(UsageFormatting.tokens(tokens))"
-            }
-            return "\(prefix) —"
+
+            return MenuBarSummaryItem(provider: provider, value: value)
         }
-        .joined(separator: " · ")
     }
 }
