@@ -16,17 +16,10 @@ struct QuotaPeekApp: App {
     @ViewBuilder
     private var menuBarLabel: some View {
         if !state.menuBarItems.isEmpty {
-            HStack(spacing: 4) {
-                ForEach(Array(state.menuBarItems.enumerated()), id: \.offset) { index, item in
-                    if index > 0 {
-                        Text("·")
-                    }
-                    ProviderLogo(provider: item.provider, size: 18)
-                    Text(item.value.displayText)
-                }
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(menuBarAccessibilityLabel)
+            MenuBarSummaryImage(items: state.menuBarItems)
+                .fixedSize()
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(menuBarAccessibilityLabel)
         } else {
             Image(systemName: "gauge.with.dots.needle.67percent")
                 .accessibilityLabel("QuotaPeek")

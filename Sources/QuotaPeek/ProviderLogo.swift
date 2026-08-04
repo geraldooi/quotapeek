@@ -7,7 +7,7 @@ struct ProviderLogo: View {
     var size: CGFloat = 28
 
     var body: some View {
-        if let image = logoImage {
+        if let image = ProviderLogoAsset.image(for: provider) {
             Image(nsImage: image)
                 .resizable()
                 .renderingMode(.original)
@@ -16,8 +16,10 @@ struct ProviderLogo: View {
                 .accessibilityHidden(true)
         }
     }
+}
 
-    private var logoImage: NSImage? {
+enum ProviderLogoAsset {
+    static func image(for provider: Provider) -> NSImage? {
         let resourceName = provider == .codex ? "codex" : "claude-code"
         guard let url = Bundle.main.url(
             forResource: resourceName,
