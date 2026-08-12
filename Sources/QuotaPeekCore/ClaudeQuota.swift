@@ -130,8 +130,31 @@ public struct ClaudeQuotaStore: Sendable {
         let data = try Data(contentsOf: cacheURL)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
-        return try decoder.decode(ClaudeQuotaCapture.self, from: data)
+        let capture: ClaudeQuotaCapture
+        do {
+            capture = try decoder.decode(ClaudeQuotaCapture.self, from: data)
+        } catch {
+            throw ClaudeQuotaStoreError.invalidCapture
+        }
+        let windows = [capture.fiveHour, capture.sevenDay].compactMap { $0 }
+        guard
+            capture.capturedAt.timeIntervalSince1970.isFinite,
+            !windows.isEmpty,
+            windows.allSatisfy({ window in
+                window.usedPercent.isFinite
+                    && (0...100).contains(window.usedPercent)
+                    && window.resetAt.timeIntervalSince1970.isFinite
+                    && window.resetAt.timeIntervalSince1970 > 0
+            })
+        else {
+            throw ClaudeQuotaStoreError.invalidCapture
+        }
+        return capture
     }
+}
+
+public enum ClaudeQuotaStoreError: Error {
+    case invalidCapture
 }
 
 public enum ClaudeQuotaCaptureStatus: String, Sendable {
@@ -273,7 +296,7 @@ public struct ClaudeQuotaReader: Sendable {
                 )
             }
             capture = loaded
-        } catch is DecodingError {
+        } catch is ClaudeQuotaStoreError {
             return unavailable(
                 kind: .unsupportedFormat,
                 title: "Claude quota cache is invalid",

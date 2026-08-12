@@ -169,4 +169,41 @@ struct ClaudeStatusLineIntegrationTests {
         #expect(FileManager.default.fileExists(atPath: integration.paths.backupURL.path))
         #expect(FileManager.default.fileExists(atPath: integration.paths.captureStatusURL.path))
     }
+
+    @Test("Malformed backups cannot change settings or remove artifacts")
+    func rejectsMalformedBackups() throws {
+        let malformedBackups: [[String: Any]] = [
+            [:],
+            ["hadStatusLine": "yes"],
+            ["hadStatusLine": true],
+            ["hadStatusLine": false, "statusLine": ["command": "unexpected"]]
+        ]
+
+        for malformedBackup in malformedBackups {
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            let settingsURL = root.appendingPathComponent("settings.json")
+            let helperSourceURL = root.appendingPathComponent("helper")
+            let supportDirectory = root.appendingPathComponent("support")
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try Data("working helper".utf8).write(to: helperSourceURL)
+            defer { try? FileManager.default.removeItem(at: root) }
+
+            let integration = ClaudeStatusLineIntegration(
+                settingsURL: settingsURL,
+                supportDirectory: supportDirectory
+            )
+            try integration.install(helperSourceURL: helperSourceURL)
+            let installedSettings = try Data(contentsOf: settingsURL)
+            try JSONSerialization.data(withJSONObject: malformedBackup)
+                .write(to: integration.paths.backupURL)
+
+            #expect(throws: ClaudeStatusLineIntegrationError.self) {
+                try integration.uninstall()
+            }
+            #expect(try Data(contentsOf: settingsURL) == installedSettings)
+            #expect(FileManager.default.fileExists(atPath: integration.helperURL.path))
+            #expect(FileManager.default.fileExists(atPath: integration.paths.backupURL.path))
+        }
+    }
 }

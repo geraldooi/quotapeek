@@ -224,7 +224,11 @@ final class AppState: ObservableObject {
     }
 
     func setClaudeQuotaIntegrationEnabled(_ isEnabled: Bool) {
-        guard isEnabled != isClaudeQuotaIntegrationEnabled else { return }
+        guard isEnabled != isClaudeQuotaIntegrationEnabled
+            || claudeQuotaRetryTarget == isEnabled
+        else {
+            return
+        }
         claudeQuotaIntegrationError = nil
         claudeQuotaRetryTarget = nil
 

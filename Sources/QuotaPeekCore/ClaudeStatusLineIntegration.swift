@@ -59,8 +59,9 @@ public struct ClaudeStatusLineIntegration: Sendable {
 
     public var originalCommand: String? {
         guard
-            let backup = readJSONObject(at: paths.backupURL),
-            let statusLine = backup["statusLine"] as? [String: Any]
+            let backup = try? readBackup(),
+            case .statusLine(let value) = backup,
+            let statusLine = value as? [String: Any]
         else {
             return nil
         }
@@ -81,8 +82,8 @@ public struct ClaudeStatusLineIntegration: Sendable {
                 backup["statusLine"] = existingStatusLine
             }
             try writeJSONObject(backup, to: paths.backupURL)
-        } else if readJSONObject(at: paths.backupURL) == nil {
-            throw ClaudeStatusLineIntegrationError.invalidBackup
+        } else {
+            _ = try readBackup()
         }
 
         try fileManager.createDirectory(
@@ -127,13 +128,10 @@ public struct ClaudeStatusLineIntegration: Sendable {
         let statusLine = settings["statusLine"] as? [String: Any]
         let command = statusLine?["command"] as? String
         if command == bridgeCommand {
-            guard let backup = readJSONObject(at: paths.backupURL) else {
-                throw ClaudeStatusLineIntegrationError.invalidBackup
-            }
-            if backup["hadStatusLine"] as? Bool == true,
-               let statusLine = backup["statusLine"] {
-                settings["statusLine"] = statusLine
-            } else {
+            switch try readBackup() {
+            case .statusLine(let previousStatusLine):
+                settings["statusLine"] = previousStatusLine
+            case .none:
                 settings.removeValue(forKey: "statusLine")
             }
             try writeJSONObject(settings, to: settingsURL)
@@ -158,6 +156,28 @@ public struct ClaudeStatusLineIntegration: Sendable {
 
     private var bridgeCommand: String {
         shellQuote(helperURL.path)
+    }
+
+    private func readBackup() throws -> ClaudeStatusLineBackup {
+        guard
+            let backup = readJSONObject(at: paths.backupURL),
+            let rawHadStatusLine = backup["hadStatusLine"],
+            rawHadStatusLine is Bool,
+            let hadStatusLine = rawHadStatusLine as? Bool
+        else {
+            throw ClaudeStatusLineIntegrationError.invalidBackup
+        }
+        if hadStatusLine {
+            guard backup.keys.contains("statusLine"),
+                  let statusLine = backup["statusLine"] else {
+                throw ClaudeStatusLineIntegrationError.invalidBackup
+            }
+            return .statusLine(statusLine)
+        }
+        guard !backup.keys.contains("statusLine") else {
+            throw ClaudeStatusLineIntegrationError.invalidBackup
+        }
+        return .none
     }
 
     private func readJSONObject(at url: URL) -> [String: Any]? {
@@ -200,6 +220,11 @@ public struct ClaudeStatusLineIntegration: Sendable {
     private func shellQuote(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
+}
+
+private enum ClaudeStatusLineBackup {
+    case none
+    case statusLine(Any)
 }
 
 public enum ClaudeStatusLineIntegrationError: LocalizedError {

@@ -149,6 +149,29 @@ struct ClaudeQuotaTests {
         #expect(snapshot.statusMessage == "Claude quota cache is invalid")
     }
 
+    @Test("Reports semantically invalid Claude quota cache values")
+    func reportsInvalidCacheValues() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data(
+            """
+            {"capturedAt":1786500000,"fiveHour":{"resetAt":1893456000,"usedPercent":250}}
+            """.utf8
+        ).write(to: cacheURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            integrationEnabled: true
+        ).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .unsupportedFormat)
+        #expect(snapshot.statusMessage == "Claude quota cache is invalid")
+    }
+
     @Test("Reports an unreadable Claude quota cache")
     func reportsUnreadableCache() throws {
         let root = FileManager.default.temporaryDirectory
