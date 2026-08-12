@@ -40,7 +40,8 @@ struct ClaudeStatusLineIntegrationTests {
 
         #expect(integration.isInstalled)
         #expect(FileManager.default.fileExists(atPath: integration.helperURL.path))
-        #expect(integration.originalCommand == "~/.claude/my-statusline.sh")
+        let originalCommand = try integration.originalCommand()
+        #expect(originalCommand == "~/.claude/my-statusline.sh")
         let installed = try #require(
             JSONSerialization.jsonObject(with: Data(contentsOf: settingsURL))
                 as? [String: Any]
@@ -204,6 +205,29 @@ struct ClaudeStatusLineIntegrationTests {
             #expect(try Data(contentsOf: settingsURL) == installedSettings)
             #expect(FileManager.default.fileExists(atPath: integration.helperURL.path))
             #expect(FileManager.default.fileExists(atPath: integration.paths.backupURL.path))
+        }
+    }
+
+    @Test("A malformed backup is surfaced to the runtime forwarding path")
+    func reportsMalformedBackupDuringForwarding() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let settingsURL = root.appendingPathComponent("settings.json")
+        let helperSourceURL = root.appendingPathComponent("helper")
+        let supportDirectory = root.appendingPathComponent("support")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("working helper".utf8).write(to: helperSourceURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let integration = ClaudeStatusLineIntegration(
+            settingsURL: settingsURL,
+            supportDirectory: supportDirectory
+        )
+        try integration.install(helperSourceURL: helperSourceURL)
+        try Data("malformed".utf8).write(to: integration.paths.backupURL)
+
+        #expect(throws: ClaudeStatusLineIntegrationError.self) {
+            try integration.originalCommand()
         }
     }
 }

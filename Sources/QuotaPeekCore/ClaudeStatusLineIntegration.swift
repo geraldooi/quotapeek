@@ -57,15 +57,18 @@ public struct ClaudeStatusLineIntegration: Sendable {
             && FileManager.default.isExecutableFile(atPath: helperURL.path)
     }
 
-    public var originalCommand: String? {
-        guard
-            let backup = try? readBackup(),
-            case .statusLine(let value) = backup,
-            let statusLine = value as? [String: Any]
-        else {
+    public func originalCommand() throws -> String? {
+        guard case .statusLine(let value) = try readBackup() else {
             return nil
         }
-        return statusLine["command"] as? String
+        guard let statusLine = value as? [String: Any] else {
+            throw ClaudeStatusLineIntegrationError.invalidBackup
+        }
+        guard let rawCommand = statusLine["command"] else { return nil }
+        guard let command = rawCommand as? String else {
+            throw ClaudeStatusLineIntegrationError.invalidBackup
+        }
+        return command
     }
 
     public func install(helperSourceURL: URL) throws {

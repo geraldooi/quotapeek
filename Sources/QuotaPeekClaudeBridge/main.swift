@@ -32,25 +32,32 @@ let integration = ClaudeStatusLineIntegration(
     supportDirectory: supportDirectory
 )
 
-if let originalCommand = integration.originalCommand {
-    let process = Process()
-    let standardInput = Pipe()
-    let standardOutput = Pipe()
-    process.executableURL = URL(fileURLWithPath: "/bin/sh")
-    process.arguments = ["-c", originalCommand]
-    process.standardInput = standardInput
-    process.standardOutput = standardOutput
-    process.standardError = FileHandle.standardError
+do {
+    if let originalCommand = try integration.originalCommand() {
+        let process = Process()
+        let standardInput = Pipe()
+        let standardOutput = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", originalCommand]
+        process.standardInput = standardInput
+        process.standardOutput = standardOutput
+        process.standardError = FileHandle.standardError
 
-    do {
-        try process.run()
-        standardInput.fileHandleForWriting.write(input)
-        try standardInput.fileHandleForWriting.close()
-        let output = standardOutput.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        FileHandle.standardOutput.write(output)
-        exit(process.terminationStatus)
-    } catch {
-        exit(1)
+        do {
+            try process.run()
+            standardInput.fileHandleForWriting.write(input)
+            try standardInput.fileHandleForWriting.close()
+            let output = standardOutput.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            FileHandle.standardOutput.write(output)
+            exit(process.terminationStatus)
+        } catch {
+            exit(1)
+        }
     }
+} catch {
+    try? ClaudeQuotaCaptureStatusStore(
+        statusURL: paths.captureStatusURL
+    ).record(.forwardingFailure)
+    exit(1)
 }

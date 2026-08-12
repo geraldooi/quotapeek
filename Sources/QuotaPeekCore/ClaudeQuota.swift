@@ -62,8 +62,13 @@ public enum ClaudeQuotaCaptureParser {
             return .invalid
         }
 
-        let fiveHour = window(from: limits["five_hour"])
-        let sevenDay = window(from: limits["seven_day"])
+        let fiveHourResult = window(named: "five_hour", in: limits)
+        let sevenDayResult = window(named: "seven_day", in: limits)
+        guard fiveHourResult != .invalid, sevenDayResult != .invalid else {
+            return .invalid
+        }
+        let fiveHour = fiveHourResult.value
+        let sevenDay = sevenDayResult.value
         guard fiveHour != nil || sevenDay != nil else { return .invalid }
 
         return .capture(
@@ -75,7 +80,12 @@ public enum ClaudeQuotaCaptureParser {
         )
     }
 
-    private static func window(from value: Any?) -> ClaudeQuotaWindow? {
+    private static func window(
+        named key: String,
+        in limits: [String: Any]
+    ) -> WindowParseResult {
+        guard limits.keys.contains(key) else { return .absent }
+        let value = limits[key]
         guard
             let object = value as? [String: Any],
             !isBoolean(object["used_percentage"]),
@@ -85,17 +95,30 @@ public enum ClaudeQuotaCaptureParser {
             let resetTimestamp = JSONValue.double(object["resets_at"]),
             resetTimestamp > 0
         else {
-            return nil
+            return .invalid
         }
 
-        return ClaudeQuotaWindow(
-            usedPercent: usedPercent,
-            resetAt: Date(timeIntervalSince1970: resetTimestamp)
+        return .window(
+            ClaudeQuotaWindow(
+                usedPercent: usedPercent,
+                resetAt: Date(timeIntervalSince1970: resetTimestamp)
+            )
         )
     }
 
     private static func isBoolean(_ value: Any?) -> Bool {
         value is Bool
+    }
+
+    private enum WindowParseResult: Equatable {
+        case absent
+        case invalid
+        case window(ClaudeQuotaWindow)
+
+        var value: ClaudeQuotaWindow? {
+            guard case .window(let window) = self else { return nil }
+            return window
+        }
     }
 }
 
@@ -162,6 +185,7 @@ public enum ClaudeQuotaCaptureStatus: String, Sendable {
     case invalidPayload = "invalid-payload"
     case permissionFailure = "permission-failure"
     case writeFailure = "write-failure"
+    case forwardingFailure = "forwarding-failure"
 
     public static func failure(for error: Error) -> ClaudeQuotaCaptureStatus {
         UsageReaderSupport.isPermissionError(error)
@@ -268,6 +292,14 @@ public struct ClaudeQuotaReader: Sendable {
                     title: "Claude quota data is invalid",
                     message: "Claude Code supplied quota limits in an unexpected format.",
                     recoverySuggestion: "Update Claude Code, send one message, then refresh QuotaPeek."
+                )
+            }
+            if status == .forwardingFailure {
+                return unavailable(
+                    kind: .readError,
+                    title: "Claude status line could not be forwarded",
+                    message: "QuotaPeek could not read the saved Claude Code status-line configuration.",
+                    recoverySuggestion: "Disable and re-enable Claude quota bars, then try again."
                 )
             }
         } catch where UsageReaderSupport.isPermissionError(error) {
