@@ -117,4 +117,30 @@ struct ClaudeStatusLineIntegrationTests {
         let statusLine = try #require(restored["statusLine"] as? [String: Any])
         #expect(statusLine["command"] as? String == "~/.claude/replacement.sh")
     }
+
+    @Test("A failed bridge refresh preserves the installed helper")
+    func preservesHelperWhenRefreshFails() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let settingsURL = root.appendingPathComponent("settings.json")
+        let helperSourceURL = root.appendingPathComponent("helper")
+        let missingSourceURL = root.appendingPathComponent("missing-helper")
+        let supportDirectory = root.appendingPathComponent("support")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let originalHelper = Data("working helper".utf8)
+        try originalHelper.write(to: helperSourceURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let integration = ClaudeStatusLineIntegration(
+            settingsURL: settingsURL,
+            supportDirectory: supportDirectory
+        )
+        try integration.install(helperSourceURL: helperSourceURL)
+
+        #expect(throws: (any Error).self) {
+            try integration.install(helperSourceURL: missingSourceURL)
+        }
+        #expect(try Data(contentsOf: integration.helperURL) == originalHelper)
+        #expect(integration.isInstalled)
+    }
 }

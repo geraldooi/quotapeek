@@ -25,6 +25,10 @@ public struct ClaudeQuotaPaths: Sendable {
     public var backupURL: URL {
         supportDirectory.appendingPathComponent("claude-statusline-backup.json")
     }
+
+    public var captureStatusURL: URL {
+        supportDirectory.appendingPathComponent("claude-capture-status")
+    }
 }
 
 public struct ClaudeStatusLineIntegration: Sendable {
@@ -85,15 +89,30 @@ public struct ClaudeStatusLineIntegration: Sendable {
             at: paths.supportDirectory,
             withIntermediateDirectories: true
         )
+        try ClaudeQuotaCaptureStatusStore(
+            statusURL: paths.captureStatusURL
+        ).ensureExists()
 
-        if fileManager.fileExists(atPath: helperURL.path) {
-            try fileManager.removeItem(at: helperURL)
-        }
-        try fileManager.copyItem(at: helperSourceURL, to: helperURL)
+        let stagedHelperURL = paths.supportDirectory.appendingPathComponent(
+            ".QuotaPeekClaudeBridge-\(UUID().uuidString)"
+        )
+        defer { try? fileManager.removeItem(at: stagedHelperURL) }
+        try fileManager.copyItem(at: helperSourceURL, to: stagedHelperURL)
         try fileManager.setAttributes(
             [.posixPermissions: 0o755],
-            ofItemAtPath: helperURL.path
+            ofItemAtPath: stagedHelperURL.path
         )
+        guard fileManager.isExecutableFile(atPath: stagedHelperURL.path) else {
+            throw ClaudeStatusLineIntegrationError.invalidHelper
+        }
+        if fileManager.fileExists(atPath: helperURL.path) {
+            _ = try fileManager.replaceItemAt(
+                helperURL,
+                withItemAt: stagedHelperURL
+            )
+        } else {
+            try fileManager.moveItem(at: stagedHelperURL, to: helperURL)
+        }
 
         var bridgeStatusLine = existingStatusLine as? [String: Any] ?? [:]
         bridgeStatusLine["type"] = "command"
@@ -118,7 +137,12 @@ public struct ClaudeStatusLineIntegration: Sendable {
             try writeJSONObject(settings, to: settingsURL)
         }
 
-        for url in [paths.helperURL, paths.backupURL, paths.cacheURL]
+        for url in [
+            paths.helperURL,
+            paths.backupURL,
+            paths.cacheURL,
+            paths.captureStatusURL
+        ]
         where fileManager.fileExists(atPath: url.path) {
             try fileManager.removeItem(at: url)
         }
@@ -179,6 +203,7 @@ public struct ClaudeStatusLineIntegration: Sendable {
 public enum ClaudeStatusLineIntegrationError: LocalizedError {
     case invalidSettings
     case invalidBackup
+    case invalidHelper
 
     public var errorDescription: String? {
         switch self {
@@ -186,6 +211,8 @@ public enum ClaudeStatusLineIntegrationError: LocalizedError {
             "Claude Code settings are not valid JSON. QuotaPeek left them unchanged."
         case .invalidBackup:
             "QuotaPeek could not restore the previous Claude Code status line."
+        case .invalidHelper:
+            "QuotaPeek's Claude quota helper is not executable."
         }
     }
 }

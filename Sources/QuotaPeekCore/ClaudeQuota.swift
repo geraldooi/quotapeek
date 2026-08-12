@@ -102,12 +102,88 @@ public struct ClaudeQuotaStore: Sendable {
     }
 }
 
+public enum ClaudeQuotaCaptureStatus: String, Sendable {
+    case ready
+    case permissionFailure = "permission-failure"
+    case writeFailure = "write-failure"
+
+    public static func failure(for error: Error) -> ClaudeQuotaCaptureStatus {
+        UsageReaderSupport.isPermissionError(error)
+            ? .permissionFailure
+            : .writeFailure
+    }
+}
+
+public struct ClaudeQuotaCaptureStatusStore: Sendable {
+    public let statusURL: URL
+
+    private static let recordSize = 32
+
+    public init(statusURL: URL) {
+        self.statusURL = statusURL
+    }
+
+    public func ensureExists() throws {
+        guard !FileManager.default.fileExists(atPath: statusURL.path) else {
+            return
+        }
+        try FileManager.default.createDirectory(
+            at: statusURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try paddedData(for: .ready).write(to: statusURL, options: .withoutOverwriting)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: statusURL.path
+        )
+    }
+
+    public func record(_ status: ClaudeQuotaCaptureStatus) throws {
+        let handle = try FileHandle(forWritingTo: statusURL)
+        defer { try? handle.close() }
+        try handle.seek(toOffset: 0)
+        try handle.write(contentsOf: paddedData(for: status))
+        try handle.synchronize()
+    }
+
+    public func load() throws -> ClaudeQuotaCaptureStatus? {
+        guard FileManager.default.fileExists(atPath: statusURL.path) else {
+            return nil
+        }
+        let rawValue = String(decoding: try Data(contentsOf: statusURL), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawValue.isEmpty else { return nil }
+        guard let status = ClaudeQuotaCaptureStatus(rawValue: rawValue) else {
+            throw ClaudeQuotaCaptureStatusError.invalidStatus
+        }
+        return status
+    }
+
+    private func paddedData(for status: ClaudeQuotaCaptureStatus) -> Data {
+        let value = status.rawValue + "\n"
+        let padding = max(0, Self.recordSize - value.utf8.count)
+        return Data((value + String(repeating: " ", count: padding)).utf8)
+    }
+}
+
+public enum ClaudeQuotaCaptureStatusError: Error {
+    case invalidStatus
+}
+
 public struct ClaudeQuotaReader: Sendable {
     private let cacheURL: URL
+    private let captureStatusURL: URL
     private let integrationEnabled: Bool
 
-    public init(cacheURL: URL, integrationEnabled: Bool) {
+    public init(
+        cacheURL: URL,
+        captureStatusURL: URL? = nil,
+        integrationEnabled: Bool
+    ) {
         self.cacheURL = cacheURL
+        self.captureStatusURL = captureStatusURL
+            ?? cacheURL.deletingLastPathComponent()
+                .appendingPathComponent("claude-capture-status")
         self.integrationEnabled = integrationEnabled
     }
 
@@ -117,6 +193,32 @@ public struct ClaudeQuotaReader: Sendable {
                 title: "Claude quota bars are not enabled",
                 message: "QuotaPeek needs Claude Code's official status-line data to show account usage percentages.",
                 recoverySuggestion: "Enable Claude quota bars, then use Claude Code once."
+            )
+        }
+
+        do {
+            let status = try ClaudeQuotaCaptureStatusStore(
+                statusURL: captureStatusURL
+            ).load()
+            if status == .permissionFailure {
+                return captureWriteFailure(permissionDenied: true)
+            }
+            if status == .writeFailure {
+                return captureWriteFailure(permissionDenied: false)
+            }
+        } catch where UsageReaderSupport.isPermissionError(error) {
+            return unavailable(
+                kind: .permissionDenied,
+                title: "Claude quota status could not be accessed",
+                message: "macOS did not allow QuotaPeek to read its Claude capture status.",
+                recoverySuggestion: "Check file permissions for QuotaPeek, then refresh."
+            )
+        } catch {
+            return unavailable(
+                kind: .readError,
+                title: "Claude quota status could not be read",
+                message: "QuotaPeek could not determine whether Claude quota capture succeeded.",
+                recoverySuggestion: "Disable and re-enable Claude quota bars, then try again."
             )
         }
 
@@ -228,6 +330,20 @@ public struct ClaudeQuotaReader: Sendable {
                 dataPath: "Claude Code status-line quota cache",
                 filesFound: filesFound
             )
+        )
+    }
+
+    private func captureWriteFailure(permissionDenied: Bool) -> UsageSnapshot {
+        unavailable(
+            kind: permissionDenied ? .permissionDenied : .readError,
+            title: "Claude quota data could not be saved",
+            message: permissionDenied
+                ? "macOS did not allow the Claude quota bridge to update QuotaPeek's cache."
+                : "The Claude quota bridge could not update QuotaPeek's cache.",
+            recoverySuggestion: permissionDenied
+                ? "Check file permissions for QuotaPeek, then use Claude Code again."
+                : "Check available storage, then disable and re-enable Claude quota bars.",
+            filesFound: FileManager.default.fileExists(atPath: cacheURL.path) ? 1 : 0
         )
     }
 }

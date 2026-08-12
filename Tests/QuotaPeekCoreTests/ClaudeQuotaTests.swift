@@ -141,4 +141,50 @@ struct ClaudeQuotaTests {
         #expect(snapshot.issue?.kind == .permissionDenied)
         #expect(snapshot.statusMessage == "Claude quota cache could not be accessed")
     }
+
+    @Test("Reports a Claude quota cache write failure")
+    func reportsCacheWriteFailure() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        let statusURL = root.appendingPathComponent("claude-capture-status")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let statusStore = ClaudeQuotaCaptureStatusStore(statusURL: statusURL)
+        try statusStore.ensureExists()
+        try statusStore.record(.writeFailure)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            captureStatusURL: statusURL,
+            integrationEnabled: true
+        ).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .readError)
+        #expect(snapshot.statusMessage == "Claude quota data could not be saved")
+    }
+
+    @Test("Reports a Claude quota cache permission failure")
+    func reportsCachePermissionFailure() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        let statusURL = root.appendingPathComponent("claude-capture-status")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let statusStore = ClaudeQuotaCaptureStatusStore(statusURL: statusURL)
+        try statusStore.ensureExists()
+        try statusStore.record(.permissionFailure)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            captureStatusURL: statusURL,
+            integrationEnabled: true
+        ).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .permissionDenied)
+        #expect(snapshot.statusMessage == "Claude quota data could not be saved")
+    }
 }

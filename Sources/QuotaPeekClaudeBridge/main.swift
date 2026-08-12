@@ -8,7 +8,15 @@ let supportDirectory = executableURL.deletingLastPathComponent()
 let paths = ClaudeQuotaPaths(supportDirectory: supportDirectory)
 
 if let capture = ClaudeQuotaCaptureParser.parse(data: input) {
-    try? ClaudeQuotaStore(cacheURL: paths.cacheURL).save(capture)
+    let statusStore = ClaudeQuotaCaptureStatusStore(
+        statusURL: paths.captureStatusURL
+    )
+    do {
+        try ClaudeQuotaStore(cacheURL: paths.cacheURL).save(capture)
+        try statusStore.record(.ready)
+    } catch {
+        try? statusStore.record(.failure(for: error))
+    }
 }
 
 let integration = ClaudeStatusLineIntegration(
