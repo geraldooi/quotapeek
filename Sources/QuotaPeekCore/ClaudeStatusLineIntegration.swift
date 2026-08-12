@@ -123,8 +123,10 @@ public struct ClaudeStatusLineIntegration: Sendable {
 
     public func uninstall() throws {
         let fileManager = FileManager.default
-        if currentCommand == bridgeCommand {
-            var settings = try readSettings()
+        var settings = try readSettings()
+        let statusLine = settings["statusLine"] as? [String: Any]
+        let command = statusLine?["command"] as? String
+        if command == bridgeCommand {
             guard let backup = readJSONObject(at: paths.backupURL) else {
                 throw ClaudeStatusLineIntegrationError.invalidBackup
             }

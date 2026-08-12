@@ -52,8 +52,10 @@ public enum ClaudeQuotaCaptureParser {
     private static func window(from value: Any?) -> ClaudeQuotaWindow? {
         guard
             let object = value as? [String: Any],
+            !isBoolean(object["used_percentage"]),
             let usedPercent = JSONValue.double(object["used_percentage"]),
             (0...100).contains(usedPercent),
+            !isBoolean(object["resets_at"]),
             let resetTimestamp = JSONValue.double(object["resets_at"]),
             resetTimestamp > 0
         else {
@@ -64,6 +66,10 @@ public enum ClaudeQuotaCaptureParser {
             usedPercent: usedPercent,
             resetAt: Date(timeIntervalSince1970: resetTimestamp)
         )
+    }
+
+    private static func isBoolean(_ value: Any?) -> Bool {
+        value is Bool
     }
 }
 

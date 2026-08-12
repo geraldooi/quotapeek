@@ -51,6 +51,23 @@ struct ClaudeQuotaTests {
         #expect(capture.sevenDay?.usedPercent == 68)
     }
 
+    @Test("Rejects booleans in Claude quota numeric fields")
+    func rejectsBooleanNumericFields() {
+        let booleanPercentage = Data(
+            """
+            {"rate_limits":{"five_hour":{"used_percentage":true,"resets_at":1786543200}}}
+            """.utf8
+        )
+        let booleanReset = Data(
+            """
+            {"rate_limits":{"five_hour":{"used_percentage":42.5,"resets_at":true}}}
+            """.utf8
+        )
+
+        #expect(ClaudeQuotaCaptureParser.parse(data: booleanPercentage) == nil)
+        #expect(ClaudeQuotaCaptureParser.parse(data: booleanReset) == nil)
+    }
+
     @Test("Reads cached Claude quota as percentage windows")
     func readsCachedQuotaWindows() throws {
         let root = FileManager.default.temporaryDirectory

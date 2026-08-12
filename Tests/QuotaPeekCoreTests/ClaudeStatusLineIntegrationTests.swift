@@ -143,4 +143,30 @@ struct ClaudeStatusLineIntegrationTests {
         #expect(try Data(contentsOf: integration.helperURL) == originalHelper)
         #expect(integration.isInstalled)
     }
+
+    @Test("A failed settings read preserves all uninstall artifacts")
+    func preservesArtifactsWhenSettingsCannotBeRead() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let settingsURL = root.appendingPathComponent("settings.json")
+        let helperSourceURL = root.appendingPathComponent("helper")
+        let supportDirectory = root.appendingPathComponent("support")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("working helper".utf8).write(to: helperSourceURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let integration = ClaudeStatusLineIntegration(
+            settingsURL: settingsURL,
+            supportDirectory: supportDirectory
+        )
+        try integration.install(helperSourceURL: helperSourceURL)
+        try Data("temporarily malformed".utf8).write(to: settingsURL)
+
+        #expect(throws: ClaudeStatusLineIntegrationError.self) {
+            try integration.uninstall()
+        }
+        #expect(FileManager.default.fileExists(atPath: integration.helperURL.path))
+        #expect(FileManager.default.fileExists(atPath: integration.paths.backupURL.path))
+        #expect(FileManager.default.fileExists(atPath: integration.paths.captureStatusURL.path))
+    }
 }
