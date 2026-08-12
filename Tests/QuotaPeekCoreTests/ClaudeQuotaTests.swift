@@ -99,4 +99,46 @@ struct ClaudeQuotaTests {
         #expect(snapshot.statusMessage == "Claude quota bars are not enabled")
         #expect(snapshot.windows.isEmpty)
     }
+
+    @Test("Reports a malformed Claude quota cache")
+    func reportsMalformedCache() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("not valid JSON".utf8).write(to: cacheURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            integrationEnabled: true
+        ).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .unsupportedFormat)
+        #expect(snapshot.statusMessage == "Claude quota cache is invalid")
+    }
+
+    @Test("Reports an unreadable Claude quota cache")
+    func reportsUnreadableCache() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: cacheURL)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o000],
+            ofItemAtPath: cacheURL.path
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            integrationEnabled: true
+        ).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .permissionDenied)
+        #expect(snapshot.statusMessage == "Claude quota cache could not be accessed")
+    }
 }

@@ -91,11 +91,14 @@ public struct ClaudeQuotaStore: Sendable {
         )
     }
 
-    public func load() -> ClaudeQuotaCapture? {
-        guard let data = try? Data(contentsOf: cacheURL) else { return nil }
+    public func load() throws -> ClaudeQuotaCapture? {
+        guard FileManager.default.fileExists(atPath: cacheURL.path) else {
+            return nil
+        }
+        let data = try Data(contentsOf: cacheURL)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
-        return try? decoder.decode(ClaudeQuotaCapture.self, from: data)
+        return try decoder.decode(ClaudeQuotaCapture.self, from: data)
     }
 }
 
@@ -117,11 +120,39 @@ public struct ClaudeQuotaReader: Sendable {
             )
         }
 
-        guard let capture = ClaudeQuotaStore(cacheURL: cacheURL).load() else {
+        let capture: ClaudeQuotaCapture
+        do {
+            guard let loaded = try ClaudeQuotaStore(cacheURL: cacheURL).load() else {
+                return unavailable(
+                    title: "Waiting for Claude quota data",
+                    message: "Claude Code has not supplied its five-hour and weekly limits yet.",
+                    recoverySuggestion: "Send one Claude Code message, then refresh QuotaPeek."
+                )
+            }
+            capture = loaded
+        } catch is DecodingError {
             return unavailable(
-                title: "Waiting for Claude quota data",
-                message: "Claude Code has not supplied its five-hour and weekly limits yet.",
-                recoverySuggestion: "Send one Claude Code message, then refresh QuotaPeek."
+                kind: .unsupportedFormat,
+                title: "Claude quota cache is invalid",
+                message: "QuotaPeek found Claude quota data, but it was not in the expected format.",
+                recoverySuggestion: "Disable and re-enable Claude quota bars, then use Claude Code once.",
+                filesFound: 1
+            )
+        } catch where UsageReaderSupport.isPermissionError(error) {
+            return unavailable(
+                kind: .permissionDenied,
+                title: "Claude quota cache could not be accessed",
+                message: "macOS did not allow QuotaPeek to read the Claude quota cache.",
+                recoverySuggestion: "Check file permissions for QuotaPeek, then refresh.",
+                filesFound: 1
+            )
+        } catch {
+            return unavailable(
+                kind: .readError,
+                title: "Claude quota cache could not be read",
+                message: "QuotaPeek found the Claude quota cache but could not read it.",
+                recoverySuggestion: "Disable and re-enable Claude quota bars, then try again.",
+                filesFound: 1
             )
         }
 
@@ -178,21 +209,24 @@ public struct ClaudeQuotaReader: Sendable {
     }
 
     private func unavailable(
+        kind: UsageIssueKind = .quotaLimitsUnavailable,
         title: String,
         message: String,
-        recoverySuggestion: String
+        recoverySuggestion: String,
+        filesFound: Int = 0
     ) -> UsageSnapshot {
         UsageSnapshot(
             provider: .claude,
             health: .needsAttention,
             issue: UsageIssue(
-                kind: .quotaLimitsUnavailable,
+                kind: kind,
                 title: title,
                 message: message,
                 recoverySuggestion: recoverySuggestion
             ),
             diagnostics: UsageDiagnostics(
-                dataPath: "Claude Code status-line quota cache"
+                dataPath: "Claude Code status-line quota cache",
+                filesFound: filesFound
             )
         )
     }
