@@ -23,7 +23,8 @@ struct UsagePopover: View {
                             resetForecast: state.codexResetForecast,
                             appVersion: versionLabel,
                             onRefresh: { state.refresh() },
-                            onEnableClaudeQuota: nil
+                            claudeQuotaRecoveryLabel: nil,
+                            onClaudeQuotaRecovery: nil
                         )
                     }
                     if state.providerVisibility.showsClaude {
@@ -33,9 +34,8 @@ struct UsagePopover: View {
                             resetForecast: nil,
                             appVersion: versionLabel,
                             onRefresh: { state.refresh() },
-                            onEnableClaudeQuota: state.isClaudeQuotaIntegrationEnabled
-                                ? nil
-                                : { state.setClaudeQuotaIntegrationEnabled(true) }
+                            claudeQuotaRecoveryLabel: claudeQuotaRecoveryLabel,
+                            onClaudeQuotaRecovery: claudeQuotaRecoveryAction
                         )
                     }
                 }
@@ -49,6 +49,22 @@ struct UsagePopover: View {
         }
         .frame(width: 360)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var claudeQuotaRecoveryLabel: String? {
+        if let target = state.claudeQuotaRetryTarget {
+            return target ? "Try enabling again" : "Try disabling again"
+        }
+        return state.isClaudeQuotaIntegrationEnabled ? nil : "Enable quota bars"
+    }
+
+    private var claudeQuotaRecoveryAction: (() -> Void)? {
+        guard claudeQuotaRecoveryLabel != nil else { return nil }
+        return {
+            let target = state.claudeQuotaRetryTarget
+                ?? !state.isClaudeQuotaIntegrationEnabled
+            state.setClaudeQuotaIntegrationEnabled(target)
+        }
     }
 
     private var header: some View {
@@ -214,7 +230,8 @@ private struct ProviderCard: View {
     let resetForecast: CodexResetForecast?
     let appVersion: String
     let onRefresh: () -> Void
-    let onEnableClaudeQuota: (() -> Void)?
+    let claudeQuotaRecoveryLabel: String?
+    let onClaudeQuotaRecovery: (() -> Void)?
 
     @State private var showsDiagnostics = false
 
@@ -260,7 +277,8 @@ private struct ProviderCard: View {
                         issue: issue,
                         canShowDiagnostics: snapshot.diagnostics != nil,
                         onRefresh: onRefresh,
-                        onEnableClaudeQuota: onEnableClaudeQuota,
+                        recoveryLabel: claudeQuotaRecoveryLabel,
+                        onRecovery: onClaudeQuotaRecovery,
                         onShowDiagnostics: { showsDiagnostics = true }
                     )
                 }
@@ -325,7 +343,8 @@ private struct UsageIssueView: View {
     let issue: UsageIssue
     let canShowDiagnostics: Bool
     let onRefresh: () -> Void
-    let onEnableClaudeQuota: (() -> Void)?
+    let recoveryLabel: String?
+    let onRecovery: (() -> Void)?
     let onShowDiagnostics: () -> Void
 
     var body: some View {
@@ -344,14 +363,12 @@ private struct UsageIssueView: View {
 
             HStack(spacing: 12) {
                 Button(
-                    onEnableClaudeQuota == nil ? "Try again" : "Enable quota bars",
-                    action: onEnableClaudeQuota ?? onRefresh
+                    recoveryLabel ?? "Try again",
+                    action: onRecovery ?? onRefresh
                 )
                     .buttonStyle(.link)
                     .accessibilityLabel(
-                        onEnableClaudeQuota == nil
-                            ? "Try \(provider.displayName) again"
-                            : "Enable Claude Code quota bars"
+                        recoveryLabel ?? "Try \(provider.displayName) again"
                     )
 
                 if canShowDiagnostics {

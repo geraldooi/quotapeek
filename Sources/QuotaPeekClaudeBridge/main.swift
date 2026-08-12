@@ -7,7 +7,8 @@ let executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
 let supportDirectory = executableURL.deletingLastPathComponent()
 let paths = ClaudeQuotaPaths(supportDirectory: supportDirectory)
 
-if let capture = ClaudeQuotaCaptureParser.parse(data: input) {
+switch ClaudeQuotaCaptureParser.result(data: input) {
+case .capture(let capture):
     let statusStore = ClaudeQuotaCaptureStatusStore(
         statusURL: paths.captureStatusURL
     )
@@ -17,6 +18,12 @@ if let capture = ClaudeQuotaCaptureParser.parse(data: input) {
     } catch {
         try? statusStore.record(.failure(for: error))
     }
+case .invalid:
+    try? ClaudeQuotaCaptureStatusStore(
+        statusURL: paths.captureStatusURL
+    ).record(.invalidPayload)
+case .unavailable:
+    break
 }
 
 let integration = ClaudeStatusLineIntegration(

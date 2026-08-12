@@ -13,6 +13,7 @@ final class AppState: ObservableObject {
     @Published private(set) var menuBarSummaryMode: MenuBarSummaryMode
     @Published private(set) var isClaudeQuotaIntegrationEnabled: Bool
     @Published private(set) var claudeQuotaIntegrationError: String?
+    @Published private(set) var claudeQuotaRetryTarget: Bool?
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastRefresh: Date?
     @Published private(set) var lastRefreshWasManual = false
@@ -137,7 +138,8 @@ final class AppState: ObservableObject {
                 codex = codexSnapshot
             }
             if let claudeSnapshot = result.1,
-               claudeIntegrationEnabled == isClaudeQuotaIntegrationEnabled {
+               claudeIntegrationEnabled == isClaudeQuotaIntegrationEnabled,
+               claudeQuotaRetryTarget == nil {
                 claude = claudeSnapshot
             }
 
@@ -224,6 +226,7 @@ final class AppState: ObservableObject {
     func setClaudeQuotaIntegrationEnabled(_ isEnabled: Bool) {
         guard isEnabled != isClaudeQuotaIntegrationEnabled else { return }
         claudeQuotaIntegrationError = nil
+        claudeQuotaRetryTarget = nil
 
         do {
             if isEnabled {
@@ -235,6 +238,7 @@ final class AppState: ObservableObject {
                 try claudeIntegration.uninstall()
             }
             isClaudeQuotaIntegrationEnabled = claudeIntegration.isInstalled
+            claudeQuotaRetryTarget = nil
             claude = ClaudeQuotaReader(
                 cacheURL: claudeIntegration.paths.cacheURL,
                 integrationEnabled: isClaudeQuotaIntegrationEnabled
@@ -243,6 +247,7 @@ final class AppState: ObservableObject {
         } catch {
             isClaudeQuotaIntegrationEnabled = claudeIntegration.isInstalled
             claudeQuotaIntegrationError = error.localizedDescription
+            claudeQuotaRetryTarget = isEnabled
             let action = isEnabled ? "enabled" : "disabled"
             claude = UsageSnapshot(
                 provider: .claude,

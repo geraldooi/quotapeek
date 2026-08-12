@@ -26,26 +26,52 @@ public struct ClaudeQuotaCapture: Codable, Equatable, Sendable {
     }
 }
 
+public enum ClaudeQuotaCaptureParseResult: Equatable, Sendable {
+    case unavailable
+    case invalid
+    case capture(ClaudeQuotaCapture)
+}
+
 public enum ClaudeQuotaCaptureParser {
     public static func parse(
         data: Data,
         capturedAt: Date = Date()
     ) -> ClaudeQuotaCapture? {
-        guard
-            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let limits = root["rate_limits"] as? [String: Any]
-        else {
+        guard case .capture(let capture) = result(
+            data: data,
+            capturedAt: capturedAt
+        ) else {
             return nil
+        }
+        return capture
+    }
+
+    public static func result(
+        data: Data,
+        capturedAt: Date = Date()
+    ) -> ClaudeQuotaCaptureParseResult {
+        guard
+            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return .invalid
+        }
+        guard let rawLimits = root["rate_limits"] else {
+            return .unavailable
+        }
+        guard let limits = rawLimits as? [String: Any] else {
+            return .invalid
         }
 
         let fiveHour = window(from: limits["five_hour"])
         let sevenDay = window(from: limits["seven_day"])
-        guard fiveHour != nil || sevenDay != nil else { return nil }
+        guard fiveHour != nil || sevenDay != nil else { return .invalid }
 
-        return ClaudeQuotaCapture(
-            capturedAt: capturedAt,
-            fiveHour: fiveHour,
-            sevenDay: sevenDay
+        return .capture(
+            ClaudeQuotaCapture(
+                capturedAt: capturedAt,
+                fiveHour: fiveHour,
+                sevenDay: sevenDay
+            )
         )
     }
 
@@ -110,6 +136,7 @@ public struct ClaudeQuotaStore: Sendable {
 
 public enum ClaudeQuotaCaptureStatus: String, Sendable {
     case ready
+    case invalidPayload = "invalid-payload"
     case permissionFailure = "permission-failure"
     case writeFailure = "write-failure"
 
@@ -211,6 +238,14 @@ public struct ClaudeQuotaReader: Sendable {
             }
             if status == .writeFailure {
                 return captureWriteFailure(permissionDenied: false)
+            }
+            if status == .invalidPayload {
+                return unavailable(
+                    kind: .unsupportedFormat,
+                    title: "Claude quota data is invalid",
+                    message: "Claude Code supplied quota limits in an unexpected format.",
+                    recoverySuggestion: "Update Claude Code, send one message, then refresh QuotaPeek."
+                )
             }
         } catch where UsageReaderSupport.isPermissionError(error) {
             return unavailable(

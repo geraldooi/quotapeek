@@ -68,6 +68,19 @@ struct ClaudeQuotaTests {
         #expect(ClaudeQuotaCaptureParser.parse(data: booleanReset) == nil)
     }
 
+    @Test("Distinguishes absent limits from malformed limits")
+    func distinguishesUnavailableAndInvalidLimits() {
+        let unavailable = Data("{\"model\":{\"id\":\"claude\"}}".utf8)
+        let invalid = Data(
+            """
+            {"rate_limits":{"five_hour":{"used_percentage":true,"resets_at":1786543200}}}
+            """.utf8
+        )
+
+        #expect(ClaudeQuotaCaptureParser.result(data: unavailable) == .unavailable)
+        #expect(ClaudeQuotaCaptureParser.result(data: invalid) == .invalid)
+    }
+
     @Test("Reads cached Claude quota as percentage windows")
     func readsCachedQuotaWindows() throws {
         let root = FileManager.default.temporaryDirectory
@@ -203,5 +216,28 @@ struct ClaudeQuotaTests {
         #expect(snapshot.health == .needsAttention)
         #expect(snapshot.issue?.kind == .permissionDenied)
         #expect(snapshot.statusMessage == "Claude quota data could not be saved")
+    }
+
+    @Test("Reports malformed Claude status-line quota data")
+    func reportsInvalidCapture() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        let statusURL = root.appendingPathComponent("claude-capture-status")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let statusStore = ClaudeQuotaCaptureStatusStore(statusURL: statusURL)
+        try statusStore.ensureExists()
+        try statusStore.record(.invalidPayload)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            captureStatusURL: statusURL,
+            integrationEnabled: true
+        ).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .unsupportedFormat)
+        #expect(snapshot.statusMessage == "Claude quota data is invalid")
     }
 }
