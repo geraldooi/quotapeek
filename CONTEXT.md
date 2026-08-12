@@ -10,7 +10,8 @@ An AI coding tool whose usage QuotaPeek can inspect, currently Codex or Claude C
 _Avoid_: Service, account
 
 **Usage source**:
-The provider-owned local records from which QuotaPeek derives usage information.
+Provider-owned local data from which QuotaPeek obtains trustworthy usage
+information, including records and official status-line quota fields.
 _Avoid_: Account API, telemetry feed
 
 **Usage snapshot**:
@@ -26,11 +27,6 @@ _Avoid_: Session, billing cycle
 The portion of a provider-reported quota window that has been consumed.
 It is shown only when the usage source supports that value.
 _Avoid_: Token percentage, estimated quota
-
-**Observed token usage**:
-Tokens found in trustworthy local records during a stated period. It is not a
-subscription quota percentage or an all-time account total.
-_Avoid_: Claude quota, remaining allowance
 
 **Reset time**:
 The provider-reported time when a quota window is expected to renew.

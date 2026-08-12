@@ -11,6 +11,8 @@ final class AppState: ObservableObject {
     @Published private(set) var availableUpdate: AppRelease?
     @Published private(set) var providerVisibility: ProviderVisibility
     @Published private(set) var menuBarSummaryMode: MenuBarSummaryMode
+    @Published private(set) var isClaudeQuotaIntegrationEnabled: Bool
+    @Published private(set) var claudeQuotaIntegrationError: String?
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastRefresh: Date?
     @Published private(set) var lastRefreshWasManual = false
@@ -19,6 +21,7 @@ final class AppState: ObservableObject {
     private var forecastRefreshAfter = Date.distantPast
     private var releaseRefreshAfter = Date.distantPast
     private let defaults: UserDefaults
+    private let claudeIntegration: ClaudeStatusLineIntegration
 
     private enum PreferenceKey {
         static let showsCodex = "providerVisibility.codex"
@@ -26,8 +29,13 @@ final class AppState: ObservableObject {
         static let menuBarSummaryMode = "menuBarSummaryMode"
     }
 
-    init(defaults: UserDefaults = .standard) {
+    init(
+        defaults: UserDefaults = .standard,
+        claudeIntegration: ClaudeStatusLineIntegration = .currentUser
+    ) {
         self.defaults = defaults
+        self.claudeIntegration = claudeIntegration
+        isClaudeQuotaIntegrationEnabled = claudeIntegration.isInstalled
         providerVisibility = ProviderVisibility(
             showsCodex: defaults.object(forKey: PreferenceKey.showsCodex) as? Bool ?? true,
             showsClaude: defaults.object(forKey: PreferenceKey.showsClaude) as? Bool ?? true
@@ -49,6 +57,7 @@ final class AppState: ObservableObject {
             .sink { [weak self] _ in
                 self?.refresh(announcesCompletion: false)
             }
+        refreshBundledClaudeBridgeIfNeeded()
     }
 
     var menuBarItems: [MenuBarSummaryItem] {
@@ -96,6 +105,8 @@ final class AppState: ObservableObject {
         guard !isRefreshing else { return }
         isRefreshing = true
         let visibility = providerVisibility
+        let claudeIntegrationEnabled = isClaudeQuotaIntegrationEnabled
+        let claudeCacheURL = claudeIntegration.paths.cacheURL
         let shouldRefreshForecast = Date() >= forecastRefreshAfter
         let currentVersion = AppVersion.current
         let shouldRefreshRelease = currentVersion != nil && Date() >= releaseRefreshAfter
@@ -113,14 +124,20 @@ final class AppState: ObservableObject {
             let result = await Task.detached(priority: .utility) {
                 (
                     visibility.showsCodex ? CodexUsageReader().load() : nil,
-                    visibility.showsClaude ? ClaudeUsageReader().load() : nil
+                    visibility.showsClaude
+                        ? ClaudeQuotaReader(
+                            cacheURL: claudeCacheURL,
+                            integrationEnabled: claudeIntegrationEnabled
+                        ).load()
+                        : nil
                 )
             }.value
 
             if let codexSnapshot = result.0 {
                 codex = codexSnapshot
             }
-            if let claudeSnapshot = result.1 {
+            if let claudeSnapshot = result.1,
+               claudeIntegrationEnabled == isClaudeQuotaIntegrationEnabled {
                 claude = claudeSnapshot
             }
 
@@ -204,6 +221,62 @@ final class AppState: ObservableObject {
         defaults.set(mode.rawValue, forKey: PreferenceKey.menuBarSummaryMode)
     }
 
+    func setClaudeQuotaIntegrationEnabled(_ isEnabled: Bool) {
+        guard isEnabled != isClaudeQuotaIntegrationEnabled else { return }
+        claudeQuotaIntegrationError = nil
+
+        do {
+            if isEnabled {
+                guard let helperURL = bundledClaudeBridgeURL else {
+                    throw ClaudeQuotaIntegrationError.helperMissing
+                }
+                try claudeIntegration.install(helperSourceURL: helperURL)
+            } else {
+                try claudeIntegration.uninstall()
+            }
+            isClaudeQuotaIntegrationEnabled = claudeIntegration.isInstalled
+            claude = ClaudeQuotaReader(
+                cacheURL: claudeIntegration.paths.cacheURL,
+                integrationEnabled: isClaudeQuotaIntegrationEnabled
+            ).load()
+            refresh(announcesCompletion: false)
+        } catch {
+            isClaudeQuotaIntegrationEnabled = claudeIntegration.isInstalled
+            claudeQuotaIntegrationError = error.localizedDescription
+            let action = isEnabled ? "enabled" : "disabled"
+            claude = UsageSnapshot(
+                provider: .claude,
+                health: .needsAttention,
+                issue: UsageIssue(
+                    kind: .readError,
+                    title: "Claude quota bars could not be \(action)",
+                    message: error.localizedDescription,
+                    recoverySuggestion: "Check Claude Code settings, then try again."
+                )
+            )
+        }
+    }
+
+    private func refreshBundledClaudeBridgeIfNeeded() {
+        guard
+            isClaudeQuotaIntegrationEnabled,
+            let helperURL = bundledClaudeBridgeURL
+        else {
+            return
+        }
+        do {
+            try claudeIntegration.install(helperSourceURL: helperURL)
+        } catch {
+            claudeQuotaIntegrationError = error.localizedDescription
+        }
+    }
+
+    private var bundledClaudeBridgeURL: URL? {
+        let url = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Helpers/QuotaPeekClaudeBridge")
+        return FileManager.default.isExecutableFile(atPath: url.path) ? url : nil
+    }
+
     private func announceRefreshCompletion() {
         NSAccessibility.post(
             element: NSApplication.shared,
@@ -217,5 +290,13 @@ final class AppState: ObservableObject {
 
     func quit() {
         NSApplication.shared.terminate(nil)
+    }
+}
+
+private enum ClaudeQuotaIntegrationError: LocalizedError {
+    case helperMissing
+
+    var errorDescription: String? {
+        "QuotaPeek could not find its Claude quota helper. Reinstall the app and try again."
     }
 }

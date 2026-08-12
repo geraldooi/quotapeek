@@ -1,0 +1,102 @@
+import Foundation
+import Testing
+@testable import QuotaPeekCore
+
+@Suite("Claude quota")
+struct ClaudeQuotaTests {
+    @Test("Parses official five-hour and seven-day status-line limits")
+    func parsesOfficialRateLimits() throws {
+        let payload = Data(
+            """
+            {
+              "rate_limits": {
+                "five_hour": {
+                  "used_percentage": 42.5,
+                  "resets_at": 1786543200
+                },
+                "seven_day": {
+                  "used_percentage": 68,
+                  "resets_at": 1787025600
+                }
+              }
+            }
+            """.utf8
+        )
+
+        let capture = try #require(
+            ClaudeQuotaCaptureParser.parse(
+                data: payload,
+                capturedAt: Date(timeIntervalSince1970: 1_786_500_000)
+            )
+        )
+
+        #expect(capture.capturedAt == Date(timeIntervalSince1970: 1_786_500_000))
+        #expect(capture.fiveHour?.usedPercent == 42.5)
+        #expect(capture.fiveHour?.resetAt == Date(timeIntervalSince1970: 1_786_543_200))
+        #expect(capture.sevenDay?.usedPercent == 68)
+        #expect(capture.sevenDay?.resetAt == Date(timeIntervalSince1970: 1_787_025_600))
+    }
+
+    @Test("Accepts independently available Claude quota windows")
+    func acceptsPartialRateLimits() throws {
+        let payload = Data(
+            """
+            {"rate_limits":{"seven_day":{"used_percentage":68,"resets_at":1787025600}}}
+            """.utf8
+        )
+
+        let capture = try #require(ClaudeQuotaCaptureParser.parse(data: payload))
+
+        #expect(capture.fiveHour == nil)
+        #expect(capture.sevenDay?.usedPercent == 68)
+    }
+
+    @Test("Reads cached Claude quota as percentage windows")
+    func readsCachedQuotaWindows() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let capture = ClaudeQuotaCapture(
+            capturedAt: Date(timeIntervalSince1970: 1_786_500_000),
+            fiveHour: ClaudeQuotaWindow(
+                usedPercent: 42.5,
+                resetAt: Date(timeIntervalSince1970: 1_786_543_200)
+            ),
+            sevenDay: ClaudeQuotaWindow(
+                usedPercent: 68,
+                resetAt: Date(timeIntervalSince1970: 1_787_025_600)
+            )
+        )
+        try ClaudeQuotaStore(cacheURL: cacheURL).save(capture)
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            integrationEnabled: true
+        ).load(now: Date(timeIntervalSince1970: 1_786_500_100))
+
+        #expect(snapshot.health == .ready)
+        #expect(snapshot.windows.count == 2)
+        #expect(snapshot.windows[0].label == "5 hours")
+        #expect(snapshot.windows[0].usedPercent == 42.5)
+        #expect(snapshot.windows[0].resetAt == Date(timeIntervalSince1970: 1_786_543_200))
+        #expect(snapshot.windows[1].label == "Weekly")
+        #expect(snapshot.windows[1].usedPercent == 68)
+        #expect(snapshot.windows[1].resetAt == Date(timeIntervalSince1970: 1_787_025_600))
+    }
+
+    @Test("Explains how to enable Claude quota capture")
+    func explainsDisabledIntegration() {
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: URL(fileURLWithPath: "/unused"),
+            integrationEnabled: false
+        ).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .quotaLimitsUnavailable)
+        #expect(snapshot.statusMessage == "Claude quota bars are not enabled")
+        #expect(snapshot.windows.isEmpty)
+    }
+}

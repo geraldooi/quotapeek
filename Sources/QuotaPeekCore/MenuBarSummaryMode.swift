@@ -67,7 +67,7 @@ public enum MenuBarSummaryMode: String, CaseIterable, Equatable, Sendable {
             let snapshot = provider == .codex ? codex : claude
             let value: MenuBarSummaryValue
 
-            if provider == .codex, let used = snapshot.windows.first?.usedPercent {
+            if let used = snapshot.windows.first?.usedPercent {
                 value = .percent(Int(used.rounded()))
             } else if let tokens = snapshot.windows.first?.tokens {
                 value = .tokens(tokens)

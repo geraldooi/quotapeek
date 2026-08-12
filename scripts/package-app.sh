@@ -6,6 +6,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 BUILD_DIR="$ROOT/.build"
 APP_DIR="$ROOT/dist/QuotaPeek.app"
 CONTENTS_DIR="$APP_DIR/Contents"
+HELPERS_DIR="$CONTENTS_DIR/Helpers"
 BRAND_ICON_SOURCE_DIR="$ROOT/Sources/QuotaPeek/Resources/BrandIcons"
 BRAND_ICON_DEST_DIR="$CONTENTS_DIR/Resources/BrandIcons"
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
@@ -24,11 +25,15 @@ swift build \
     --scratch-path "$BUILD_DIR/x86_64"
 
 rm -rf "$APP_DIR"
-mkdir -p "$CONTENTS_DIR/MacOS" "$BRAND_ICON_DEST_DIR"
+mkdir -p "$CONTENTS_DIR/MacOS" "$HELPERS_DIR" "$BRAND_ICON_DEST_DIR"
 lipo -create \
     "$BUILD_DIR/arm64/arm64-apple-macosx/release/QuotaPeek" \
     "$BUILD_DIR/x86_64/x86_64-apple-macosx/release/QuotaPeek" \
     -output "$CONTENTS_DIR/MacOS/QuotaPeek"
+lipo -create \
+    "$BUILD_DIR/arm64/arm64-apple-macosx/release/QuotaPeekClaudeBridge" \
+    "$BUILD_DIR/x86_64/x86_64-apple-macosx/release/QuotaPeekClaudeBridge" \
+    -output "$HELPERS_DIR/QuotaPeekClaudeBridge"
 cp "$ROOT/packaging/Info.plist" "$CONTENTS_DIR/Info.plist"
 cp "$BRAND_ICON_SOURCE_DIR/codex.png" "$BRAND_ICON_DEST_DIR/codex.png"
 cp "$BRAND_ICON_SOURCE_DIR/claude-code.png" "$BRAND_ICON_DEST_DIR/claude-code.png"

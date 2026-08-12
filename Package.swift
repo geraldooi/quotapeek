@@ -8,7 +8,11 @@ let package = Package(
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "QuotaPeek", targets: ["QuotaPeek"])
+        .executable(name: "QuotaPeek", targets: ["QuotaPeek"]),
+        .executable(
+            name: "QuotaPeekClaudeBridge",
+            targets: ["QuotaPeekClaudeBridge"]
+        )
     ],
     targets: [
         .target(
@@ -20,6 +24,10 @@ let package = Package(
             resources: [
                 .process("Resources")
             ]
+        ),
+        .executableTarget(
+            name: "QuotaPeekClaudeBridge",
+            dependencies: ["QuotaPeekCore"]
         ),
         .testTarget(
             name: "QuotaPeekCoreTests",
