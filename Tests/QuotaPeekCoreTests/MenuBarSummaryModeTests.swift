@@ -72,7 +72,7 @@ struct MenuBarSummaryModeTests {
         )
         let claude = UsageSnapshot(
             provider: .claude,
-            windows: [UsageWindow(label: "Today", tokens: 12_500)]
+            windows: [UsageWindow(label: "5 hours", usedPercent: 41)]
         )
 
         #expect(
@@ -82,7 +82,7 @@ struct MenuBarSummaryModeTests {
                 claude: claude
             ) == [
                 MenuBarSummaryItem(provider: .codex, value: .percent(69)),
-                MenuBarSummaryItem(provider: .claude, value: .tokens(12_500))
+                MenuBarSummaryItem(provider: .claude, value: .percent(41))
             ]
         )
         #expect(
@@ -97,7 +97,7 @@ struct MenuBarSummaryModeTests {
                 visibility: visibility,
                 codex: codex,
                 claude: claude
-            ) == [MenuBarSummaryItem(provider: .claude, value: .tokens(12_500))]
+            ) == [MenuBarSummaryItem(provider: .claude, value: .percent(41))]
         )
         #expect(
             MenuBarSummaryMode.iconOnly.summaryItems(

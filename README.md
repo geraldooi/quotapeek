@@ -1,11 +1,11 @@
 # QuotaPeek
 
-A small, native macOS menu-bar app for seeing Codex and Claude Code token usage at a glance.
+A small, native macOS menu-bar app for seeing Codex and Claude Code quota usage at a glance.
 
 ## What it shows
 
 - **Codex:** rolling usage percentage, remaining percentage, reset time, and next-48-hour reset forecast.
-- **Claude Code:** tokens used in the last five hours and tokens used today.
+- **Claude Code:** official five-hour and weekly usage percentages and reset times.
 - A configurable menu-bar summary for all visible providers, one provider, or an icon-only mode.
 - A subtle release-page link when a newer stable QuotaPeek version is available.
 - Actionable recovery states with privacy-safe diagnostics when local usage cannot be read.
@@ -16,7 +16,12 @@ QuotaPeek reads usage records locally from:
 
 - `~/.codex/sessions`
 - `~/.codex/archived_sessions`
-- `~/.claude/projects`
+
+Claude quota bars use an opt-in local status-line bridge. QuotaPeek preserves
+and forwards any existing Claude Code status-line command, then stores only the
+official five-hour and seven-day percentages and reset times that Claude Code
+provides after an API response. It does not read Claude credentials or call an
+authenticated Anthropic endpoint.
 
 It does not read prompt or response text, send analytics, or access credentials.
 To show the Codex reset forecast, QuotaPeek makes an unauthenticated HTTPS GET
@@ -28,7 +33,8 @@ to GitHub's public latest-release endpoint at launch and then at most once every
 six hours after a successful check. This request also has no payload and does
 not include local usage data.
 
-> Claude Code's local records do not contain a reliable subscription quota percentage. QuotaPeek reports observed Claude token usage rather than guessing how much of a plan remains.
+> Enable **Claude quota bars** from QuotaPeek settings, then send one Claude
+> Code message so Claude can provide current quota data.
 
 ## Requirements
 

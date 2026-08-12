@@ -22,7 +22,9 @@ struct UsagePopover: View {
                             tint: .blue,
                             resetForecast: state.codexResetForecast,
                             appVersion: versionLabel,
-                            onRefresh: { state.refresh() }
+                            onRefresh: { state.refresh() },
+                            claudeQuotaRecoveryLabel: nil,
+                            onClaudeQuotaRecovery: nil
                         )
                     }
                     if state.providerVisibility.showsClaude {
@@ -31,7 +33,9 @@ struct UsagePopover: View {
                             tint: .orange,
                             resetForecast: nil,
                             appVersion: versionLabel,
-                            onRefresh: { state.refresh() }
+                            onRefresh: { state.refresh() },
+                            claudeQuotaRecoveryLabel: claudeQuotaRecoveryLabel,
+                            onClaudeQuotaRecovery: claudeQuotaRecoveryAction
                         )
                     }
                 }
@@ -47,10 +51,26 @@ struct UsagePopover: View {
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
+    private var claudeQuotaRecoveryLabel: String? {
+        if let target = state.claudeQuotaRetryTarget {
+            return target ? "Try enabling again" : "Try disabling again"
+        }
+        return state.isClaudeQuotaIntegrationEnabled ? nil : "Enable quota bars"
+    }
+
+    private var claudeQuotaRecoveryAction: (() -> Void)? {
+        guard claudeQuotaRecoveryLabel != nil else { return nil }
+        return {
+            let target = state.claudeQuotaRetryTarget
+                ?? !state.isClaudeQuotaIntegrationEnabled
+            state.setClaudeQuotaIntegrationEnabled(target)
+        }
+    }
+
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Token usage")
+                Text("Quota usage")
                     .font(.headline)
                 Text(state.providerVisibility.subtitle)
                     .font(.caption)
@@ -79,7 +99,7 @@ struct UsagePopover: View {
                 .contentShape(Rectangle())
                 .help("Refresh usage")
                 .accessibilityLabel(
-                    state.isRefreshing ? "Refreshing token usage" : "Refresh token usage"
+                    state.isRefreshing ? "Refreshing quota usage" : "Refresh quota usage"
                 )
                 .disabled(state.isRefreshing)
 
@@ -94,6 +114,16 @@ struct UsagePopover: View {
             Section("Providers") {
                 providerToggle(.codex)
                 providerToggle(.claude)
+            }
+
+            Section("Claude Code") {
+                Toggle(
+                    "Claude quota bars",
+                    isOn: Binding(
+                        get: { state.isClaudeQuotaIntegrationEnabled },
+                        set: { state.setClaudeQuotaIntegrationEnabled($0) }
+                    )
+                )
             }
 
             Section("Menu bar summary") {
@@ -200,6 +230,8 @@ private struct ProviderCard: View {
     let resetForecast: CodexResetForecast?
     let appVersion: String
     let onRefresh: () -> Void
+    let claudeQuotaRecoveryLabel: String?
+    let onClaudeQuotaRecovery: (() -> Void)?
 
     @State private var showsDiagnostics = false
 
@@ -245,6 +277,8 @@ private struct ProviderCard: View {
                         issue: issue,
                         canShowDiagnostics: snapshot.diagnostics != nil,
                         onRefresh: onRefresh,
+                        recoveryLabel: claudeQuotaRecoveryLabel,
+                        onRecovery: onClaudeQuotaRecovery,
                         onShowDiagnostics: { showsDiagnostics = true }
                     )
                 }
@@ -309,6 +343,8 @@ private struct UsageIssueView: View {
     let issue: UsageIssue
     let canShowDiagnostics: Bool
     let onRefresh: () -> Void
+    let recoveryLabel: String?
+    let onRecovery: (() -> Void)?
     let onShowDiagnostics: () -> Void
 
     var body: some View {
@@ -326,9 +362,14 @@ private struct UsageIssueView: View {
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 12) {
-                Button("Try again", action: onRefresh)
+                Button(
+                    recoveryLabel ?? "Try again",
+                    action: onRecovery ?? onRefresh
+                )
                     .buttonStyle(.link)
-                    .accessibilityLabel("Try \(provider.displayName) again")
+                    .accessibilityLabel(
+                        recoveryLabel ?? "Try \(provider.displayName) again"
+                    )
 
                 if canShowDiagnostics {
                     Button("View diagnostics", action: onShowDiagnostics)
