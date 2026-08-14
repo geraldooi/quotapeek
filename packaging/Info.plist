@@ -10,6 +10,8 @@
     <string>QuotaPeek</string>
     <key>CFBundleIdentifier</key>
     <string>com.geraldooi.quotapeek</string>
+    <key>CFBundleIconFile</key>
+    <string>QuotaPeek.icns</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
