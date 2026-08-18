@@ -73,7 +73,8 @@ The workflow:
 3. Builds an `arm64` and `x86_64` universal app.
 4. Applies an ad-hoc code signature.
 5. Publishes `QuotaPeek-<version>.zip` in the GitHub release.
-6. Updates `Casks/quotapeek.rb` in `geraldooi/homebrew-tap`.
+6. Adds Homebrew installation and update commands to the release notes.
+7. Updates `Casks/quotapeek.rb` in `geraldooi/homebrew-tap`.
 
 Tags and release artifacts are immutable outputs. Never replace an existing
 version. The manual **Release** workflow input is only a recovery path for an

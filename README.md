@@ -42,6 +42,28 @@ not include local usage data.
 - Xcode Command Line Tools
 - Codex and/or Claude Code used at least once
 
+## Install and update with Homebrew
+
+Homebrew is QuotaPeek's supported installation and update channel. Install the
+latest stable release with:
+
+```sh
+brew install --cask geraldooi/tap/quotapeek
+```
+
+When QuotaPeek shows a newer version in its footer, the link opens that
+version's GitHub release notes. It does not modify the installed app. Update the
+Homebrew cask with:
+
+```sh
+brew update
+brew upgrade --cask geraldooi/tap/quotapeek
+```
+
+Releases are ad-hoc signed and are not notarized by Apple, so macOS may require
+first-launch approval under **System Settings → Privacy & Security → Open
+Anyway**.
+
 ## Build and run
 
 ```sh
@@ -59,23 +81,6 @@ make install
 ```
 
 This copies the app to `~/Applications`, so administrator access is not needed.
-
-## Homebrew distribution
-
-Stable releases are versioned and published through GitHub Actions. Release
-Please keeps a release pull request updated from conventional feature and fix
-titles. Merging that release pull request publishes the app and updates the
-cask in
-[`geraldooi/homebrew-tap`](https://github.com/geraldooi/homebrew-tap), after
-which users can install with:
-
-```sh
-brew install --cask geraldooi/tap/quotapeek
-```
-
-Releases are ad-hoc signed and are not notarized by Apple, so macOS may require
-first-launch approval under **System Settings → Privacy & Security → Open
-Anyway**.
 
 See [packaging/README.md](packaging/README.md) for the release steps.
 
