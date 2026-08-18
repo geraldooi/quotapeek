@@ -41,7 +41,8 @@ repository. No Apple signing or notarization credentials are required.
    `VERSION` and generated `CHANGELOG.md`.
 3. Merge the release pull request when the accumulated changes are ready.
 4. The Release workflow creates the tag and GitHub release, uploads the
-   universal archive, and publishes the Homebrew cask.
+   universal archive, adds Homebrew install and update commands to the release
+   notes, and publishes the Homebrew cask.
 
 ## Homebrew tap
 
@@ -64,7 +65,7 @@ For later versions:
 
 ```sh
 brew update
-brew upgrade --cask quotapeek
+brew upgrade --cask geraldooi/tap/quotapeek
 ```
 
 ## Manual recovery

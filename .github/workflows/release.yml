@@ -131,20 +131,35 @@ jobs:
             gh release upload "$TAG_NAME" "dist/$ASSET"
           fi
 
-      - name: Add distribution notice to release
+      - name: Add Homebrew instructions and distribution notice
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
           UPDATED_NOTES_FILE="$RUNNER_TEMP/release-notes-updated.md"
+          HOMEBREW_HEADING='## Install or update with Homebrew'
           NOTICE='QuotaPeek is ad-hoc signed and is not notarized by Apple. On first launch, macOS may require approval in System Settings → Privacy & Security → Open Anyway.'
 
           gh release view "$TAG_NAME" --json body --jq .body > "$NOTES_FILE"
-          if ! grep -Fq 'QuotaPeek is ad-hoc signed' "$NOTES_FILE"; then
+          if ! grep -Fq "$HOMEBREW_HEADING" "$NOTES_FILE"; then
             {
-              printf '%s\n\n' "$NOTICE"
+              printf '%s\n\n' "$HOMEBREW_HEADING"
+              printf '%s\n\n' 'Homebrew is the supported installation and update channel for QuotaPeek.'
+              printf '%s\n\n' '**New installation:**'
+              printf '%s\n%s\n%s\n\n' '```sh' 'brew install --cask geraldooi/tap/quotapeek' '```'
+              printf '%s\n\n' '**Update an existing installation:**'
+              printf '%s\n%s\n%s\n%s\n\n' '```sh' 'brew update' 'brew upgrade --cask geraldooi/tap/quotapeek' '```'
+              if ! grep -Fq 'QuotaPeek is ad-hoc signed' "$NOTES_FILE"; then
+                printf '%s\n\n' "$NOTICE"
+              fi
               cat "$NOTES_FILE"
+            } > "$UPDATED_NOTES_FILE"
+            gh release edit "$TAG_NAME" --notes-file "$UPDATED_NOTES_FILE"
+          elif ! grep -Fq 'QuotaPeek is ad-hoc signed' "$NOTES_FILE"; then
+            {
+              cat "$NOTES_FILE"
+              printf '\n%s\n' "$NOTICE"
             } > "$UPDATED_NOTES_FILE"
             gh release edit "$TAG_NAME" --notes-file "$UPDATED_NOTES_FILE"
           fi
