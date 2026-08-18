@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/geraldooi/quotapeek/compare/v0.6.0...v0.7.0) (2026-08-14)
+
+
+### Features
+
+* **claude:** show five-hour and weekly quota bars ([#32](https://github.com/geraldooi/quotapeek/issues/32)) ([dcd3f1d](https://github.com/geraldooi/quotapeek/commit/dcd3f1d7eb771a3be3e727b7268ead4e057489fa))
+* **packaging:** add QuotaPeek app icon ([#33](https://github.com/geraldooi/quotapeek/issues/33)) ([824d3b8](https://github.com/geraldooi/quotapeek/commit/824d3b800203c66117a028d7929f5e0b1eb9cd82))
+
+
+### Bug Fixes
+
+* **menu-bar:** repair summary controls and settings layout ([#28](https://github.com/geraldooi/quotapeek/issues/28)) ([1f97d1b](https://github.com/geraldooi/quotapeek/commit/1f97d1b341babe1d8803c40b6ecc2f9600709ce0))
+* **menu-bar:** show provider logos with usage values ([#30](https://github.com/geraldooi/quotapeek/issues/30)) ([e980e08](https://github.com/geraldooi/quotapeek/commit/e980e08dbb4624cc987a540bbe31d45f28893ff0))
+
 ## [0.6.0](https://github.com/geraldooi/quotapeek/compare/v0.5.0...v0.6.0) (2026-07-31)
 
 
