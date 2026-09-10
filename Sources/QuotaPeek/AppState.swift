@@ -76,8 +76,11 @@ final class AppState: ObservableObject {
     }
 
     var hasStaleClaudeQuota: Bool {
-        providerVisibility.showsClaude
-            && claude.claudeQuotaFreshness() == .stale
+        guard providerVisibility.showsClaude else { return false }
+        return switch claude.claudeQuotaFreshness() {
+        case .stale, .unknown: true
+        case .current, .aging, nil: false
+        }
     }
 
     var refreshSummary: String {

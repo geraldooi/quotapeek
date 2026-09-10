@@ -255,6 +255,7 @@ public enum ClaudeQuotaFreshness: Equatable, Sendable {
     case current
     case aging
     case stale
+    case unknown
 }
 
 public extension UsageSnapshot {
@@ -265,7 +266,8 @@ public extension UsageSnapshot {
             return nil
         }
 
-        let age = max(0, now.timeIntervalSince(updatedAt))
+        let age = now.timeIntervalSince(updatedAt)
+        guard age.isFinite, age >= 0 else { return .unknown }
         if age < 60 { return .current }
         if age < 5 * 60 { return .aging }
         return .stale
@@ -348,6 +350,9 @@ public struct ClaudeQuotaReader: Sendable {
                     message: "Claude Code has not supplied its five-hour and weekly limits yet.",
                     recoverySuggestion: "Send one Claude Code message, then refresh QuotaPeek."
                 )
+            }
+            guard loaded.capturedAt <= now else {
+                throw ClaudeQuotaStoreError.invalidCapture
             }
             capture = loaded
         } catch is ClaudeQuotaStoreError {

@@ -139,7 +139,7 @@ struct ClaudeQuotaTests {
     }
 
     @Test("Classifies current and stale Claude quota captures")
-    func classifiesClaudeQuotaCaptureFreshness() {
+    func classifiesClaudeQuotaCaptureFreshness() throws {
         let now = Date(timeIntervalSince1970: 1_786_500_000)
         let current = UsageSnapshot(
             provider: .claude,
@@ -149,6 +149,10 @@ struct ClaudeQuotaTests {
             provider: .claude,
             updatedAt: now.addingTimeInterval(-360)
         )
+        let future = UsageSnapshot(
+            provider: .claude,
+            updatedAt: now.addingTimeInterval(60)
+        )
         let codex = UsageSnapshot(
             provider: .codex,
             updatedAt: now.addingTimeInterval(-360)
@@ -156,6 +160,8 @@ struct ClaudeQuotaTests {
 
         #expect(current.claudeQuotaFreshness(at: now) == .current)
         #expect(stale.claudeQuotaFreshness(at: now) == .stale)
+        #expect(future.claudeQuotaFreshness(at: now) == .unknown)
+        #expect(UsageFormatting.age(since: try #require(future.updatedAt), now: now) == "unknown age")
         #expect(codex.claudeQuotaFreshness(at: now) == nil)
     }
 
@@ -241,6 +247,29 @@ struct ClaudeQuotaTests {
                 now: Date(timeIntervalSince1970: 1_786_500_000)
             ) == "very old"
         )
+    }
+
+    @Test("Rejects future capture timestamps")
+    func rejectsFutureCaptureTimestamp() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data(
+            """
+            {"capturedAt":1e300,"fiveHour":{"resetAt":1893456000,"usedPercent":42},"sevenDay":{"resetAt":1894060800,"usedPercent":68}}
+            """.utf8
+        ).write(to: cacheURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            integrationEnabled: true
+        ).load(now: Date(timeIntervalSince1970: 1_786_500_000))
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .unsupportedFormat)
+        #expect(snapshot.statusMessage == "Claude quota cache is invalid")
     }
 
     @Test("Reports an unreadable Claude quota cache")

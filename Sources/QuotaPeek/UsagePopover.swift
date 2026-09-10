@@ -317,9 +317,12 @@ private struct ProviderStatusBadge: View {
 
     private var label: String {
         if let freshness {
-            return freshness == .current
-                ? "Captured now"
-                : UsageFormatting.age(since: snapshot.updatedAt ?? Date())
+            switch freshness {
+            case .current: return "Captured now"
+            case .unknown: return "Unknown age"
+            case .aging, .stale:
+                return UsageFormatting.age(since: snapshot.updatedAt ?? Date())
+            }
         }
 
         return switch snapshot.health {
@@ -349,7 +352,7 @@ private struct ProviderStatusBadge: View {
             switch freshness {
             case .current: return .green
             case .aging: return .secondary
-            case .stale: return .orange
+            case .stale, .unknown: return .orange
             }
         }
 
