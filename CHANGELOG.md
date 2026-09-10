@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/geraldooi/quotapeek/compare/v0.7.0...v0.8.0) (2026-09-10)
+
+
+### Features
+
+* **menu-bar:** show weekly quota usage ([#36](https://github.com/geraldooi/quotapeek/issues/36)) ([e6b1d23](https://github.com/geraldooi/quotapeek/commit/e6b1d2368178c6811d570e6bec00bbe074c981a6))
+
+
+### Bug Fixes
+
+* **claude:** expose quota capture freshness ([#37](https://github.com/geraldooi/quotapeek/issues/37)) ([04509c4](https://github.com/geraldooi/quotapeek/commit/04509c4daac72cd6a3af030c43f4d0e11d4293cc))
+* **release:** add Homebrew update instructions ([#34](https://github.com/geraldooi/quotapeek/issues/34)) ([7d85574](https://github.com/geraldooi/quotapeek/commit/7d85574b7b6b0dc818f10dda02db429f02b03838))
+
 ## [0.7.0](https://github.com/geraldooi/quotapeek/compare/v0.6.0...v0.7.0) (2026-08-14)
 
 
