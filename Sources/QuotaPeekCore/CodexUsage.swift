@@ -69,19 +69,35 @@ public enum CodexUsageParser {
         }
 
         let minutes = JSONValue.int(object["window_minutes"])
+        let kind: UsageWindowKind
         let label: String
         switch minutes {
-        case 300: label = "5 hours"
-        case 10_080: label = "7 days"
-        case let value where value >= 1_440: label = "\(value / 1_440) days"
-        case let value where value >= 60: label = "\(value / 60) hours"
-        default: label = "\(minutes) minutes"
+        case 300:
+            kind = .fiveHour
+            label = "5 hours"
+        case 10_080:
+            kind = .weekly
+            label = "7 days"
+        case let value where value >= 1_440:
+            kind = .other
+            label = "\(value / 1_440) days"
+        case let value where value >= 60:
+            kind = .other
+            label = "\(value / 60) hours"
+        default:
+            kind = .other
+            label = "\(minutes) minutes"
         }
 
         let resetAt = JSONValue.double(object["resets_at"]).map {
             Date(timeIntervalSince1970: $0)
         }
-        return UsageWindow(label: label, usedPercent: usedPercent, resetAt: resetAt)
+        return UsageWindow(
+            kind: kind,
+            label: label,
+            usedPercent: usedPercent,
+            resetAt: resetAt
+        )
     }
 
     private static func parseDate(_ value: String?) -> Date? {

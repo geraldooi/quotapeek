@@ -49,8 +49,10 @@ struct CodexUsageParserTests {
         #expect(snapshot.tokens.total == 1_600)
         #expect(snapshot.contextWindow == 258_400)
         #expect(snapshot.windows.count == 2)
+        #expect(snapshot.windows[0].kind == .fiveHour)
         #expect(snapshot.windows[0].label == "5 hours")
         #expect(snapshot.windows[0].usedPercent == 42.5)
+        #expect(snapshot.windows[1].kind == .weekly)
         #expect(snapshot.windows[1].label == "7 days")
         #expect(snapshot.windows[1].remainingPercent == 82)
     }

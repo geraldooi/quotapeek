@@ -3,11 +3,14 @@ import Testing
 
 @Suite("Menu-bar summary mode")
 struct MenuBarSummaryModeTests {
-    @Test("Codex-only summary uses the provider logo instead of a text prefix")
-    func codexOnlyUsesProviderLogo() {
+    @Test("Codex-only summary uses weekly usage")
+    func codexOnlyUsesWeeklyUsage() {
         let codex = UsageSnapshot(
             provider: .codex,
-            windows: [UsageWindow(label: "7 days", usedPercent: 9)]
+            windows: [
+                UsageWindow(kind: .fiveHour, label: "5 hours", usedPercent: 28),
+                UsageWindow(kind: .weekly, label: "7 days", usedPercent: 9)
+            ]
         )
 
         #expect(
@@ -25,7 +28,7 @@ struct MenuBarSummaryModeTests {
     func displaysEveryVisibleProvider() {
         let codex = UsageSnapshot(
             provider: .codex,
-            windows: [UsageWindow(label: "7 days", usedPercent: 69)]
+            windows: [UsageWindow(kind: .weekly, label: "7 days", usedPercent: 69)]
         )
         let claude = UsageSnapshot(provider: .claude, health: .inactive)
 
@@ -68,11 +71,17 @@ struct MenuBarSummaryModeTests {
         let visibility = ProviderVisibility()
         let codex = UsageSnapshot(
             provider: .codex,
-            windows: [UsageWindow(label: "7 days", usedPercent: 69)]
+            windows: [
+                UsageWindow(kind: .fiveHour, label: "5 hours", usedPercent: 28),
+                UsageWindow(kind: .weekly, label: "7 days", usedPercent: 69)
+            ]
         )
         let claude = UsageSnapshot(
             provider: .claude,
-            windows: [UsageWindow(label: "5 hours", usedPercent: 41)]
+            windows: [
+                UsageWindow(kind: .fiveHour, label: "5 hours", usedPercent: 41),
+                UsageWindow(kind: .weekly, label: "Weekly", usedPercent: 22)
+            ]
         )
 
         #expect(
@@ -82,7 +91,7 @@ struct MenuBarSummaryModeTests {
                 claude: claude
             ) == [
                 MenuBarSummaryItem(provider: .codex, value: .percent(69)),
-                MenuBarSummaryItem(provider: .claude, value: .percent(41))
+                MenuBarSummaryItem(provider: .claude, value: .percent(22))
             ]
         )
         #expect(
@@ -97,7 +106,7 @@ struct MenuBarSummaryModeTests {
                 visibility: visibility,
                 codex: codex,
                 claude: claude
-            ) == [MenuBarSummaryItem(provider: .claude, value: .percent(41))]
+            ) == [MenuBarSummaryItem(provider: .claude, value: .percent(22))]
         )
         #expect(
             MenuBarSummaryMode.iconOnly.summaryItems(
@@ -105,6 +114,29 @@ struct MenuBarSummaryModeTests {
                 codex: codex,
                 claude: claude
             ).isEmpty
+        )
+    }
+
+    @Test("Does not substitute session usage when weekly usage is unavailable")
+    func doesNotSubstituteSessionUsage() {
+        let codex = UsageSnapshot(
+            provider: .codex,
+            windows: [UsageWindow(label: "5 hours", usedPercent: 28)]
+        )
+        let claude = UsageSnapshot(
+            provider: .claude,
+            windows: [UsageWindow(label: "5 hours", usedPercent: 41)]
+        )
+
+        #expect(
+            MenuBarSummaryMode.visibleProviders.summaryItems(
+                visibility: ProviderVisibility(),
+                codex: codex,
+                claude: claude
+            ) == [
+                MenuBarSummaryItem(provider: .codex, value: .unavailable),
+                MenuBarSummaryItem(provider: .claude, value: .unavailable)
+            ]
         )
     }
 

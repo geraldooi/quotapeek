@@ -356,11 +356,13 @@ public struct ClaudeQuotaReader: Sendable {
 
         let candidates = [
             capture.fiveHour.map { window in UsageWindow(
+                kind: .fiveHour,
                 label: "5 hours",
                 usedPercent: window.usedPercent,
                 resetAt: window.resetAt
             ) },
             capture.sevenDay.map { window in UsageWindow(
+                kind: .weekly,
                 label: "Weekly",
                 usedPercent: window.usedPercent,
                 resetAt: window.resetAt
