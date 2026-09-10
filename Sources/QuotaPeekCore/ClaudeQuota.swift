@@ -162,6 +162,7 @@ public struct ClaudeQuotaStore: Sendable {
         let windows = [capture.fiveHour, capture.sevenDay].compactMap { $0 }
         guard
             capture.capturedAt.timeIntervalSince1970.isFinite,
+            capture.capturedAt.timeIntervalSince1970 > 0,
             !windows.isEmpty,
             windows.allSatisfy({ window in
                 window.usedPercent.isFinite

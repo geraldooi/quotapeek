@@ -214,6 +214,35 @@ struct ClaudeQuotaTests {
         #expect(snapshot.statusMessage == "Claude quota cache is invalid")
     }
 
+    @Test("Rejects captured timestamps too old to format safely")
+    func rejectsUnrepresentableCaptureAge() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data(
+            """
+            {"capturedAt":-1e300,"fiveHour":{"resetAt":1893456000,"usedPercent":42},"sevenDay":{"resetAt":1894060800,"usedPercent":68}}
+            """.utf8
+        ).write(to: cacheURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            integrationEnabled: true
+        ).load(now: Date(timeIntervalSince1970: 1_786_500_000))
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .unsupportedFormat)
+        #expect(snapshot.statusMessage == "Claude quota cache is invalid")
+        #expect(
+            UsageFormatting.age(
+                since: Date(timeIntervalSince1970: -1e300),
+                now: Date(timeIntervalSince1970: 1_786_500_000)
+            ) == "very old"
+        )
+    }
+
     @Test("Reports an unreadable Claude quota cache")
     func reportsUnreadableCache() throws {
         let root = FileManager.default.temporaryDirectory

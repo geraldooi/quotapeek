@@ -26,7 +26,12 @@ public enum UsageFormatting {
     }
 
     public static func age(since date: Date, now: Date = Date()) -> String {
-        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        let elapsed = now.timeIntervalSince(date)
+        guard elapsed.isFinite else { return "unknown age" }
+        if elapsed <= 0 { return "now" }
+        guard elapsed <= Double(Int.max) else { return "very old" }
+
+        let seconds = Int(elapsed)
         if seconds < 60 { return "now" }
         if seconds < 3_600 { return "\(seconds / 60)m old" }
         if seconds < 86_400 { return "\(seconds / 3_600)h old" }
