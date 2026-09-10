@@ -1,12 +1,10 @@
 public enum MenuBarSummaryValue: Equatable, Sendable {
     case percent(Int)
-    case tokens(Int)
     case unavailable
 
     public var displayText: String {
         switch self {
         case let .percent(value): "\(value)%"
-        case let .tokens(value): UsageFormatting.tokens(value)
         case .unavailable: "—"
         }
     }
@@ -14,7 +12,6 @@ public enum MenuBarSummaryValue: Equatable, Sendable {
     public var accessibilityText: String {
         switch self {
         case let .percent(value): "\(value) percent used"
-        case let .tokens(value): "\(UsageFormatting.tokens(value)) tokens used"
         case .unavailable: "usage unavailable"
         }
     }
@@ -66,11 +63,10 @@ public enum MenuBarSummaryMode: String, CaseIterable, Equatable, Sendable {
         providers(in: visibility).map { provider in
             let snapshot = provider == .codex ? codex : claude
             let value: MenuBarSummaryValue
+            let weeklyWindow = snapshot.windows.first { $0.kind == .weekly }
 
-            if let used = snapshot.windows.first?.usedPercent {
+            if let used = weeklyWindow?.usedPercent {
                 value = .percent(Int(used.rounded()))
-            } else if let tokens = snapshot.windows.first?.tokens {
-                value = .tokens(tokens)
             } else {
                 value = .unavailable
             }

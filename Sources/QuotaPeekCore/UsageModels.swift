@@ -117,13 +117,27 @@ public struct TokenBreakdown: Equatable, Sendable {
     }
 }
 
+public enum UsageWindowKind: Equatable, Sendable {
+    case fiveHour
+    case weekly
+    case other
+}
+
 public struct UsageWindow: Equatable, Sendable {
+    public let kind: UsageWindowKind
     public let label: String
     public let usedPercent: Double?
     public let resetAt: Date?
     public let tokens: Int?
 
-    public init(label: String, usedPercent: Double? = nil, resetAt: Date? = nil, tokens: Int? = nil) {
+    public init(
+        kind: UsageWindowKind = .other,
+        label: String,
+        usedPercent: Double? = nil,
+        resetAt: Date? = nil,
+        tokens: Int? = nil
+    ) {
+        self.kind = kind
         self.label = label
         self.usedPercent = usedPercent
         self.resetAt = resetAt

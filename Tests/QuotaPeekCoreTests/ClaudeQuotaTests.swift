@@ -125,9 +125,11 @@ struct ClaudeQuotaTests {
 
         #expect(snapshot.health == .ready)
         #expect(snapshot.windows.count == 2)
+        #expect(snapshot.windows[0].kind == .fiveHour)
         #expect(snapshot.windows[0].label == "5 hours")
         #expect(snapshot.windows[0].usedPercent == 42.5)
         #expect(snapshot.windows[0].resetAt == Date(timeIntervalSince1970: 1_786_543_200))
+        #expect(snapshot.windows[1].kind == .weekly)
         #expect(snapshot.windows[1].label == "Weekly")
         #expect(snapshot.windows[1].usedPercent == 68)
         #expect(snapshot.windows[1].resetAt == Date(timeIntervalSince1970: 1_787_025_600))
