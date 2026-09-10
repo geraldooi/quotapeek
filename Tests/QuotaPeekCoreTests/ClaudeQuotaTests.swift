@@ -118,10 +118,11 @@ struct ClaudeQuotaTests {
         )
         try ClaudeQuotaStore(cacheURL: cacheURL).save(capture)
 
+        let now = Date(timeIntervalSince1970: 1_786_500_120)
         let snapshot = ClaudeQuotaReader(
             cacheURL: cacheURL,
             integrationEnabled: true
-        ).load(now: Date(timeIntervalSince1970: 1_786_500_100))
+        ).load(now: now)
 
         #expect(snapshot.health == .ready)
         #expect(snapshot.windows.count == 2)
@@ -133,6 +134,29 @@ struct ClaudeQuotaTests {
         #expect(snapshot.windows[1].label == "Weekly")
         #expect(snapshot.windows[1].usedPercent == 68)
         #expect(snapshot.windows[1].resetAt == Date(timeIntervalSince1970: 1_787_025_600))
+        #expect(snapshot.claudeQuotaFreshness(at: now) == .aging)
+        #expect(UsageFormatting.age(since: try #require(snapshot.updatedAt), now: now) == "2m old")
+    }
+
+    @Test("Classifies current and stale Claude quota captures")
+    func classifiesClaudeQuotaCaptureFreshness() {
+        let now = Date(timeIntervalSince1970: 1_786_500_000)
+        let current = UsageSnapshot(
+            provider: .claude,
+            updatedAt: now.addingTimeInterval(-30)
+        )
+        let stale = UsageSnapshot(
+            provider: .claude,
+            updatedAt: now.addingTimeInterval(-360)
+        )
+        let codex = UsageSnapshot(
+            provider: .codex,
+            updatedAt: now.addingTimeInterval(-360)
+        )
+
+        #expect(current.claudeQuotaFreshness(at: now) == .current)
+        #expect(stale.claudeQuotaFreshness(at: now) == .stale)
+        #expect(codex.claudeQuotaFreshness(at: now) == nil)
     }
 
     @Test("Explains how to enable Claude quota capture")

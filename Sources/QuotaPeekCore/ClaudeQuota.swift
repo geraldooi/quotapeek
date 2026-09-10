@@ -250,6 +250,27 @@ public enum ClaudeQuotaCaptureStatusError: Error {
     case invalidStatus
 }
 
+public enum ClaudeQuotaFreshness: Equatable, Sendable {
+    case current
+    case aging
+    case stale
+}
+
+public extension UsageSnapshot {
+    func claudeQuotaFreshness(at now: Date = Date()) -> ClaudeQuotaFreshness? {
+        guard provider == .claude,
+              health == .ready,
+              let updatedAt else {
+            return nil
+        }
+
+        let age = max(0, now.timeIntervalSince(updatedAt))
+        if age < 60 { return .current }
+        if age < 5 * 60 { return .aging }
+        return .stale
+    }
+}
+
 public struct ClaudeQuotaReader: Sendable {
     private let cacheURL: URL
     private let captureStatusURL: URL

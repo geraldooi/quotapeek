@@ -75,6 +75,11 @@ final class AppState: ObservableObject {
         }
     }
 
+    var hasStaleClaudeQuota: Bool {
+        providerVisibility.showsClaude
+            && claude.claudeQuotaFreshness() == .stale
+    }
+
     var refreshSummary: String {
         if isRefreshing {
             return "Refreshing local usage…"
@@ -86,18 +91,21 @@ final class AppState: ObservableObject {
         let attentionCount = visibleSnapshots.filter(\.needsAttention).count
         switch attentionCount {
         case 0:
-            if lastRefreshWasManual {
-                return "Usage refreshed"
+            if hasStaleClaudeQuota {
+                return "Claude quota may be out of date"
             }
             let hasInactiveSource = visibleSnapshots.contains { $0.health == .inactive }
-            return hasInactiveSource ? "Usage sources checked" : "All usage sources are working"
+            if lastRefreshWasManual || hasInactiveSource {
+                return "Usage sources checked"
+            }
+            return "All usage sources are working"
         case 1:
             return lastRefreshWasManual
-                ? "Refreshed · 1 usage source needs attention"
+                ? "Checked · 1 usage source needs attention"
                 : "1 usage source needs attention"
         default:
             return lastRefreshWasManual
-                ? "Refreshed · \(attentionCount) usage sources need attention"
+                ? "Checked · \(attentionCount) usage sources need attention"
                 : "\(attentionCount) usage sources need attention"
         }
     }

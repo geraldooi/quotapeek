@@ -97,9 +97,11 @@ struct UsagePopover: View {
                 }
                 .buttonStyle(.plain)
                 .contentShape(Rectangle())
-                .help("Refresh usage")
+                .help(
+                    "Check local usage sources. Claude quota changes after Claude Code receives a response."
+                )
                 .accessibilityLabel(
-                    state.isRefreshing ? "Refreshing quota usage" : "Refresh quota usage"
+                    state.isRefreshing ? "Checking quota usage" : "Check quota usage"
                 )
                 .disabled(state.isRefreshing)
 
@@ -160,14 +162,17 @@ struct UsagePopover: View {
         if state.isRefreshing {
             return .secondary
         }
-        return state.visibleSnapshots.contains(where: \.needsAttention) ? .orange : .secondary
+        return state.visibleSnapshots.contains(where: \.needsAttention)
+            || state.hasStaleClaudeQuota
+            ? .orange
+            : .secondary
     }
 
     private var footer: some View {
         HStack(spacing: 8) {
             HStack(spacing: 3) {
                 if let lastRefresh = state.lastRefresh {
-                    Text("Updated")
+                    Text("Checked")
                     Text(lastRefresh, style: .relative)
                 }
             }
@@ -246,7 +251,7 @@ private struct ProviderCard: View {
 
                 Spacer()
 
-                ProviderStatusBadge(provider: snapshot.provider, health: snapshot.health)
+                ProviderStatusBadge(snapshot: snapshot)
             }
 
             if snapshot.health == .loading {
@@ -300,18 +305,24 @@ private struct ProviderCard: View {
 }
 
 private struct ProviderStatusBadge: View {
-    let provider: Provider
-    let health: UsageHealth
+    let snapshot: UsageSnapshot
 
     var body: some View {
         Label(label, systemImage: icon)
             .font(.caption2.weight(.medium))
             .foregroundStyle(color)
-            .accessibilityLabel("\(provider.displayName) status: \(label)")
+            .help(helpText)
+            .accessibilityLabel(accessibilityLabel)
     }
 
     private var label: String {
-        switch health {
+        if let freshness {
+            return freshness == .current
+                ? "Captured now"
+                : UsageFormatting.age(since: snapshot.updatedAt ?? Date())
+        }
+
+        return switch snapshot.health {
         case .loading: "Loading"
         case .ready: "Working"
         case .inactive: "Inactive"
@@ -321,7 +332,11 @@ private struct ProviderStatusBadge: View {
     }
 
     private var icon: String {
-        switch health {
+        if let freshness {
+            return freshness == .current ? "checkmark.circle.fill" : "clock.fill"
+        }
+
+        return switch snapshot.health {
         case .loading: "ellipsis.circle"
         case .ready: "checkmark.circle.fill"
         case .inactive: "minus.circle.fill"
@@ -330,11 +345,37 @@ private struct ProviderStatusBadge: View {
     }
 
     private var color: Color {
-        switch health {
+        if let freshness {
+            switch freshness {
+            case .current: return .green
+            case .aging: return .secondary
+            case .stale: return .orange
+            }
+        }
+
+        return switch snapshot.health {
         case .loading, .inactive: .secondary
         case .ready: .green
         case .limited, .needsAttention: .orange
         }
+    }
+
+    private var freshness: ClaudeQuotaFreshness? {
+        snapshot.claudeQuotaFreshness()
+    }
+
+    private var helpText: String {
+        guard freshness != nil, let updatedAt = snapshot.updatedAt else {
+            return "\(snapshot.provider.displayName) status: \(label)"
+        }
+        return "Claude quota captured \(UsageFormatting.age(since: updatedAt)). Send a Claude Code message to obtain fresh quota data."
+    }
+
+    private var accessibilityLabel: String {
+        guard freshness != nil else {
+            return "\(snapshot.provider.displayName) status: \(label)"
+        }
+        return "Claude Code quota capture: \(label)"
     }
 }
 
