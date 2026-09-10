@@ -118,10 +118,11 @@ struct ClaudeQuotaTests {
         )
         try ClaudeQuotaStore(cacheURL: cacheURL).save(capture)
 
+        let now = Date(timeIntervalSince1970: 1_786_500_120)
         let snapshot = ClaudeQuotaReader(
             cacheURL: cacheURL,
             integrationEnabled: true
-        ).load(now: Date(timeIntervalSince1970: 1_786_500_100))
+        ).load(now: now)
 
         #expect(snapshot.health == .ready)
         #expect(snapshot.windows.count == 2)
@@ -133,6 +134,64 @@ struct ClaudeQuotaTests {
         #expect(snapshot.windows[1].label == "Weekly")
         #expect(snapshot.windows[1].usedPercent == 68)
         #expect(snapshot.windows[1].resetAt == Date(timeIntervalSince1970: 1_787_025_600))
+        #expect(snapshot.claudeQuotaFreshness(at: now) == .aging)
+        #expect(UsageFormatting.age(since: try #require(snapshot.updatedAt), now: now) == "2m old")
+    }
+
+    @Test("Exposes capture freshness for partial Claude quota data")
+    func exposesPartialQuotaFreshness() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let now = Date(timeIntervalSince1970: 1_786_500_000)
+        let capture = ClaudeQuotaCapture(
+            capturedAt: now.addingTimeInterval(-360),
+            fiveHour: nil,
+            sevenDay: ClaudeQuotaWindow(
+                usedPercent: 68,
+                resetAt: now.addingTimeInterval(3_600)
+            )
+        )
+        try ClaudeQuotaStore(cacheURL: cacheURL).save(capture)
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            integrationEnabled: true
+        ).load(now: now)
+
+        #expect(snapshot.health == .limited)
+        #expect(snapshot.windows.count == 1)
+        #expect(snapshot.claudeQuotaFreshness(at: now) == .stale)
+    }
+
+    @Test("Classifies current and stale Claude quota captures")
+    func classifiesClaudeQuotaCaptureFreshness() throws {
+        let now = Date(timeIntervalSince1970: 1_786_500_000)
+        let current = UsageSnapshot(
+            provider: .claude,
+            updatedAt: now.addingTimeInterval(-30)
+        )
+        let stale = UsageSnapshot(
+            provider: .claude,
+            updatedAt: now.addingTimeInterval(-360)
+        )
+        let future = UsageSnapshot(
+            provider: .claude,
+            updatedAt: now.addingTimeInterval(60)
+        )
+        let codex = UsageSnapshot(
+            provider: .codex,
+            updatedAt: now.addingTimeInterval(-360)
+        )
+
+        #expect(current.claudeQuotaFreshness(at: now) == .current)
+        #expect(stale.claudeQuotaFreshness(at: now) == .stale)
+        #expect(future.claudeQuotaFreshness(at: now) == .unknown)
+        #expect(UsageFormatting.age(since: try #require(future.updatedAt), now: now) == "unknown age")
+        #expect(codex.claudeQuotaFreshness(at: now) == nil)
     }
 
     @Test("Explains how to enable Claude quota capture")
@@ -184,6 +243,58 @@ struct ClaudeQuotaTests {
             cacheURL: cacheURL,
             integrationEnabled: true
         ).load()
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .unsupportedFormat)
+        #expect(snapshot.statusMessage == "Claude quota cache is invalid")
+    }
+
+    @Test("Rejects captured timestamps too old to format safely")
+    func rejectsUnrepresentableCaptureAge() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data(
+            """
+            {"capturedAt":-1e300,"fiveHour":{"resetAt":1893456000,"usedPercent":42},"sevenDay":{"resetAt":1894060800,"usedPercent":68}}
+            """.utf8
+        ).write(to: cacheURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            integrationEnabled: true
+        ).load(now: Date(timeIntervalSince1970: 1_786_500_000))
+
+        #expect(snapshot.health == .needsAttention)
+        #expect(snapshot.issue?.kind == .unsupportedFormat)
+        #expect(snapshot.statusMessage == "Claude quota cache is invalid")
+        #expect(
+            UsageFormatting.age(
+                since: Date(timeIntervalSince1970: -1e300),
+                now: Date(timeIntervalSince1970: 1_786_500_000)
+            ) == "very old"
+        )
+    }
+
+    @Test("Rejects future capture timestamps")
+    func rejectsFutureCaptureTimestamp() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data(
+            """
+            {"capturedAt":1e300,"fiveHour":{"resetAt":1893456000,"usedPercent":42},"sevenDay":{"resetAt":1894060800,"usedPercent":68}}
+            """.utf8
+        ).write(to: cacheURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            integrationEnabled: true
+        ).load(now: Date(timeIntervalSince1970: 1_786_500_000))
 
         #expect(snapshot.health == .needsAttention)
         #expect(snapshot.issue?.kind == .unsupportedFormat)
