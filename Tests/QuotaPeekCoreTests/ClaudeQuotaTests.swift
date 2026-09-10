@@ -138,6 +138,35 @@ struct ClaudeQuotaTests {
         #expect(UsageFormatting.age(since: try #require(snapshot.updatedAt), now: now) == "2m old")
     }
 
+    @Test("Exposes capture freshness for partial Claude quota data")
+    func exposesPartialQuotaFreshness() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let cacheURL = root.appendingPathComponent("claude-rate-limits.json")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let now = Date(timeIntervalSince1970: 1_786_500_000)
+        let capture = ClaudeQuotaCapture(
+            capturedAt: now.addingTimeInterval(-360),
+            fiveHour: nil,
+            sevenDay: ClaudeQuotaWindow(
+                usedPercent: 68,
+                resetAt: now.addingTimeInterval(3_600)
+            )
+        )
+        try ClaudeQuotaStore(cacheURL: cacheURL).save(capture)
+
+        let snapshot = ClaudeQuotaReader(
+            cacheURL: cacheURL,
+            integrationEnabled: true
+        ).load(now: now)
+
+        #expect(snapshot.health == .limited)
+        #expect(snapshot.windows.count == 1)
+        #expect(snapshot.claudeQuotaFreshness(at: now) == .stale)
+    }
+
     @Test("Classifies current and stale Claude quota captures")
     func classifiesClaudeQuotaCaptureFreshness() throws {
         let now = Date(timeIntervalSince1970: 1_786_500_000)

@@ -261,7 +261,7 @@ public enum ClaudeQuotaFreshness: Equatable, Sendable {
 public extension UsageSnapshot {
     func claudeQuotaFreshness(at now: Date = Date()) -> ClaudeQuotaFreshness? {
         guard provider == .claude,
-              health == .ready,
+              health == .ready || health == .limited,
               let updatedAt else {
             return nil
         }

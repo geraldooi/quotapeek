@@ -317,12 +317,18 @@ private struct ProviderStatusBadge: View {
 
     private var label: String {
         if let freshness {
+            let captureLabel: String
             switch freshness {
-            case .current: return "Captured now"
-            case .unknown: return "Unknown age"
+            case .current: captureLabel = "Captured now"
+            case .unknown: captureLabel = "Unknown age"
             case .aging, .stale:
-                return UsageFormatting.age(since: snapshot.updatedAt ?? Date())
+                captureLabel = UsageFormatting.age(
+                    since: snapshot.updatedAt ?? Date()
+                )
             }
+            return snapshot.health == .limited
+                ? "Limited · \(captureLabel)"
+                : captureLabel
         }
 
         return switch snapshot.health {
@@ -335,6 +341,9 @@ private struct ProviderStatusBadge: View {
     }
 
     private var icon: String {
+        if snapshot.health == .limited {
+            return "exclamationmark.triangle.fill"
+        }
         if let freshness {
             return freshness == .current ? "checkmark.circle.fill" : "clock.fill"
         }
@@ -348,6 +357,9 @@ private struct ProviderStatusBadge: View {
     }
 
     private var color: Color {
+        if snapshot.health == .limited {
+            return .orange
+        }
         if let freshness {
             switch freshness {
             case .current: return .green
@@ -371,7 +383,10 @@ private struct ProviderStatusBadge: View {
         guard freshness != nil, let updatedAt = snapshot.updatedAt else {
             return "\(snapshot.provider.displayName) status: \(label)"
         }
-        return "Claude quota captured \(UsageFormatting.age(since: updatedAt)). Send a Claude Code message to obtain fresh quota data."
+        let limitedText = snapshot.health == .limited
+            ? "Only one Claude quota window is available. "
+            : ""
+        return "\(limitedText)Claude quota captured \(UsageFormatting.age(since: updatedAt)). Send a Claude Code message to obtain fresh quota data."
     }
 
     private var accessibilityLabel: String {
