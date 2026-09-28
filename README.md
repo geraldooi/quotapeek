@@ -12,18 +12,27 @@ A small, native macOS menu-bar app for seeing Codex and Claude Code quota usage 
 - VoiceOver-friendly usage summaries and refresh motion that respects macOS Reduce Motion.
 - A native SwiftUI popover that refreshes automatically every minute.
 
-QuotaPeek reads usage records locally from:
+QuotaPeek prefers live account limits and refreshes them at most once every
+five minutes automatically, or when you press refresh. Codex limits come from
+the installed Codex CLI's local app-server (`account/rateLimits/read`). Claude
+Code limits come from a direct HTTPS request to
+`https://api.anthropic.com/api/oauth/usage`, using Claude Code's existing local
+OAuth credential. QuotaPeek does not save the credential or send it to a
+QuotaPeek or third-party server. The Claude endpoint is not a stable public
+API and may stop working if Anthropic changes it.
+
+If live limits are unavailable, QuotaPeek can show a still-valid, locally
+captured quota with a limited status. Codex reads local usage records from:
 
 - `~/.codex/sessions`
 - `~/.codex/archived_sessions`
 
-Claude quota bars use an opt-in local status-line bridge. QuotaPeek preserves
+Claude quota bars can also use an opt-in local status-line bridge. QuotaPeek preserves
 and forwards any existing Claude Code status-line command, then stores only the
 official five-hour and seven-day percentages and reset times that Claude Code
-provides after an API response. It does not read Claude credentials or call an
-authenticated Anthropic endpoint.
+provides after an API response. The bridge is a fallback for live limits.
 
-It does not read prompt or response text, send analytics, or access credentials.
+It does not read prompt or response text or send analytics.
 To show the Codex reset forecast, QuotaPeek makes an unauthenticated HTTPS GET
 request to `www.willcodexquotareset.com` at launch and when that source says its
 forecast is due to refresh. The request has no payload and does not include
@@ -33,8 +42,8 @@ to GitHub's public latest-release endpoint at launch and then at most once every
 six hours after a successful check. This request also has no payload and does
 not include local usage data.
 
-> Enable **Claude quota bars** from QuotaPeek settings, then send one Claude
-> Code message so Claude can provide current quota data.
+> If live Claude limits are unavailable, enable **Claude quota bars** from
+> QuotaPeek settings and send one Claude Code message to create a local fallback.
 
 ## Requirements
 
