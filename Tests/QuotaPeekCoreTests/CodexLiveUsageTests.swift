@@ -27,6 +27,7 @@ struct CodexLiveUsageTests {
 
         let snapshot = CodexLiveUsageReader.parse(data: data, now: now)
         #expect(snapshot.health == .ready)
+        #expect(snapshot.source == .live)
         #expect(snapshot.windows.map(\.kind) == [.weekly, .fiveHour])
         #expect(snapshot.windows.map(\.usedPercent) == [37.5, 12])
         #expect(snapshot.updatedAt == now)

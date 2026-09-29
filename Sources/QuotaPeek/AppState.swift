@@ -122,6 +122,7 @@ final class AppState: ObservableObject {
         let visibility = providerVisibility
         let claudeIntegrationEnabled = isClaudeQuotaIntegrationEnabled
         let claudeCacheURL = claudeIntegration.paths.cacheURL
+        let liveReadStartedAt = Date()
         let shouldRefreshForecast = Date() >= forecastRefreshAfter
         let shouldRefreshLiveLimits = announcesCompletion || Date() >= liveLimitsRefreshAfter
         let previousCodexLiveLimits = codexLiveLimits
@@ -174,7 +175,9 @@ final class AppState: ObservableObject {
                 claude = local.map { LiveUsageFallback.select(live: live, local: $0) } ?? live
             }
             if shouldRefreshLiveLimits {
-                liveLimitsRefreshAfter = Date().addingTimeInterval(5 * 60)
+                liveLimitsRefreshAfter = LiveUsageRefreshSchedule.nextRead(
+                    after: liveReadStartedAt
+                )
             }
 
             if let forecastTask {

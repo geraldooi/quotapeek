@@ -29,6 +29,7 @@ public enum LiveUsageFallback {
         )
         return UsageSnapshot(
             provider: local.provider,
+            source: local.source,
             health: .limited,
             issue: issue,
             diagnostics: local.diagnostics,

@@ -308,36 +308,15 @@ private struct ProviderStatusBadge: View {
     let snapshot: UsageSnapshot
 
     var body: some View {
-        Label(label, systemImage: icon)
+        Label(statusText.label, systemImage: icon)
             .font(.caption2.weight(.medium))
             .foregroundStyle(color)
-            .help(helpText)
-            .accessibilityLabel(accessibilityLabel)
+            .help(statusText.help)
+            .accessibilityLabel(statusText.accessibilityLabel)
     }
 
-    private var label: String {
-        if let freshness {
-            let captureLabel: String
-            switch freshness {
-            case .current: captureLabel = "Captured now"
-            case .unknown: captureLabel = "Unknown age"
-            case .aging, .stale:
-                captureLabel = UsageFormatting.age(
-                    since: snapshot.updatedAt ?? Date()
-                )
-            }
-            return snapshot.health == .limited
-                ? "Limited · \(captureLabel)"
-                : captureLabel
-        }
-
-        return switch snapshot.health {
-        case .loading: "Loading"
-        case .ready: "Working"
-        case .inactive: "Inactive"
-        case .limited: "Limited"
-        case .needsAttention: "Needs attention"
-        }
+    private var statusText: UsageStatusText {
+        snapshot.statusText()
     }
 
     private var icon: String {
@@ -379,22 +358,6 @@ private struct ProviderStatusBadge: View {
         snapshot.claudeQuotaFreshness()
     }
 
-    private var helpText: String {
-        guard freshness != nil, let updatedAt = snapshot.updatedAt else {
-            return "\(snapshot.provider.displayName) status: \(label)"
-        }
-        let limitedText = snapshot.health == .limited
-            ? "Some Claude quota data may be unavailable or out of date. "
-            : ""
-        return "\(limitedText)Claude quota checked \(UsageFormatting.age(since: updatedAt)). Refresh QuotaPeek for current limits."
-    }
-
-    private var accessibilityLabel: String {
-        guard freshness != nil else {
-            return "\(snapshot.provider.displayName) status: \(label)"
-        }
-        return "Claude Code quota capture: \(label)"
-    }
 }
 
 private struct UsageIssueView: View {

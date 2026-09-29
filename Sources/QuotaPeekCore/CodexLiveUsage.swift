@@ -251,7 +251,7 @@ public struct CodexLiveUsageReader {
         }
 
         guard !windows.isEmpty else { return nil }
-        return UsageSnapshot(provider: .codex, health: .ready, windows: windows, updatedAt: now)
+        return UsageSnapshot(provider: .codex, source: .live, health: .ready, windows: windows, updatedAt: now)
     }
 
     private static func number(_ value: Any?) -> Double? {
@@ -270,6 +270,7 @@ public struct CodexLiveUsageReader {
     private static func failure(kind: UsageIssueKind, title: String, message: String, recovery: String, at date: Date) -> UsageSnapshot {
         UsageSnapshot(
             provider: .codex,
+            source: .live,
             health: .needsAttention,
             issue: UsageIssue(kind: kind, title: title, message: message, recoverySuggestion: recovery),
             updatedAt: date

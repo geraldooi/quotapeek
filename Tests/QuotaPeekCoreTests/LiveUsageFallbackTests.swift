@@ -25,6 +25,7 @@ struct LiveUsageFallbackTests {
         let selected = LiveUsageFallback.select(live: live, local: local, now: now)
 
         #expect(selected.health == .limited)
+        #expect(selected.source == .localCapture)
         #expect(selected.windows.first?.usedPercent == 42)
         #expect(selected.updatedAt == local.updatedAt)
         #expect(selected.issue?.title == "Live Claude Code limits unavailable")

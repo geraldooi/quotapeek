@@ -117,6 +117,7 @@ public struct ClaudeLiveUsageReader: Sendable {
 
         return UsageSnapshot(
             provider: .claude,
+            source: .live,
             health: windows.count == 2 ? .ready : .limited,
             issue: windows.count == 2 ? nil : UsageIssue(
                 kind: .quotaLimitsUnavailable,
@@ -246,6 +247,7 @@ public struct ClaudeLiveUsageReader: Sendable {
     ) -> UsageSnapshot {
         UsageSnapshot(
             provider: .claude,
+            source: .live,
             health: health,
             issue: UsageIssue(kind: kind, title: title, message: message, recoverySuggestion: recoverySuggestion),
             diagnostics: UsageDiagnostics(dataPath: "Claude Code live usage endpoint")

@@ -15,6 +15,7 @@ struct ClaudeLiveUsageTests {
         )
         let snapshot = try #require(ClaudeLiveUsageReader.parse(data: payload, now: now))
         #expect(snapshot.health == .ready)
+        #expect(snapshot.source == .live)
         #expect(snapshot.windows.map(\.kind) == [.fiveHour, .weekly])
         #expect(snapshot.windows.map(\.usedPercent) == [42.5, 68])
         #expect(snapshot.updatedAt == now)

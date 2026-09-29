@@ -12,8 +12,8 @@ A small, native macOS menu-bar app for seeing Codex and Claude Code quota usage 
 - VoiceOver-friendly usage summaries and refresh motion that respects macOS Reduce Motion.
 - A native SwiftUI popover that refreshes automatically every minute.
 
-QuotaPeek prefers live account limits and refreshes them at most once every
-five minutes automatically, or when you press refresh. Codex limits come from
+QuotaPeek prefers live account limits and refreshes them before the
+five-minute freshness threshold, or when you press refresh. Codex limits come from
 the installed Codex CLI's local app-server (`account/rateLimits/read`). Claude
 Code limits come from a direct HTTPS request to
 `https://api.anthropic.com/api/oauth/usage`, using Claude Code's existing local
