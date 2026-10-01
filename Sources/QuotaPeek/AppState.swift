@@ -21,7 +21,8 @@ final class AppState: ObservableObject {
     private var timer: AnyCancellable?
     private var forecastRefreshAfter = Date.distantPast
     private var releaseRefreshAfter = Date.distantPast
-    private var liveLimitsRefreshAfter = Date.distantPast
+    private var codexLiveLimitsRefreshAfter = Date.distantPast
+    private var claudeLiveLimitsRefreshAfter = Date.distantPast
     private var codexLiveLimits: UsageSnapshot?
     private var claudeLiveLimits: UsageSnapshot?
     private let defaults: UserDefaults
@@ -124,7 +125,16 @@ final class AppState: ObservableObject {
         let claudeCacheURL = claudeIntegration.paths.cacheURL
         let liveReadStartedAt = Date()
         let shouldRefreshForecast = Date() >= forecastRefreshAfter
-        let shouldRefreshLiveLimits = announcesCompletion || Date() >= liveLimitsRefreshAfter
+        let shouldRefreshCodexLiveLimits = announcesCompletion
+            || LiveUsageRefreshSchedule.shouldRead(
+                at: liveReadStartedAt,
+                deadline: codexLiveLimitsRefreshAfter
+            )
+        let shouldRefreshClaudeLiveLimits = announcesCompletion
+            || LiveUsageRefreshSchedule.shouldRead(
+                at: liveReadStartedAt,
+                deadline: claudeLiveLimitsRefreshAfter
+            )
         let previousCodexLiveLimits = codexLiveLimits
         let previousClaudeLiveLimits = claudeLiveLimits
         let currentVersion = AppVersion.current
@@ -142,7 +152,7 @@ final class AppState: ObservableObject {
                 : nil
             let codexTask = visibility.showsCodex
                 ? Task.detached(priority: .utility) {
-                    let live = shouldRefreshLiveLimits
+                    let live = shouldRefreshCodexLiveLimits
                         ? CodexLiveUsageReader().load()
                         : (previousCodexLiveLimits ?? CodexLiveUsageReader().load())
                     let local = live.isAvailable ? nil : CodexUsageReader().load()
@@ -151,7 +161,7 @@ final class AppState: ObservableObject {
                 : nil
             let claudeTask = visibility.showsClaude
                 ? Task.detached(priority: .utility) {
-                    let live = shouldRefreshLiveLimits
+                    let live = shouldRefreshClaudeLiveLimits
                         ? ClaudeLiveUsageReader().load()
                         : (previousClaudeLiveLimits ?? ClaudeLiveUsageReader().load())
                     let local = live.isAvailable
@@ -167,17 +177,22 @@ final class AppState: ObservableObject {
             if let (live, local) = await codexTask?.value {
                 codexLiveLimits = live
                 codex = local.map { LiveUsageFallback.select(live: live, local: $0) } ?? live
+                if shouldRefreshCodexLiveLimits {
+                    codexLiveLimitsRefreshAfter = LiveUsageRefreshSchedule.nextRead(
+                        after: liveReadStartedAt
+                    )
+                }
             }
             if let (live, local) = await claudeTask?.value,
                claudeIntegrationEnabled == isClaudeQuotaIntegrationEnabled,
                claudeQuotaRetryTarget == nil {
                 claudeLiveLimits = live
                 claude = local.map { LiveUsageFallback.select(live: live, local: $0) } ?? live
-            }
-            if shouldRefreshLiveLimits {
-                liveLimitsRefreshAfter = LiveUsageRefreshSchedule.nextRead(
-                    after: liveReadStartedAt
-                )
+                if shouldRefreshClaudeLiveLimits {
+                    claudeLiveLimitsRefreshAfter = LiveUsageRefreshSchedule.nextRead(
+                        after: liveReadStartedAt
+                    )
+                }
             }
 
             if let forecastTask {

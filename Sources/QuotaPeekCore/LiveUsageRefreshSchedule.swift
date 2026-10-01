@@ -6,4 +6,8 @@ public enum LiveUsageRefreshSchedule {
     public static func nextRead(after startedAt: Date) -> Date {
         startedAt.addingTimeInterval(3 * 60 + 30)
     }
+
+    public static func shouldRead(at now: Date, deadline: Date) -> Bool {
+        now >= deadline
+    }
 }

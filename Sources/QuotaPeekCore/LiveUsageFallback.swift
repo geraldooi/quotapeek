@@ -22,10 +22,14 @@ public enum LiveUsageFallback {
         guard local.isAvailable, !validLocalWindows.isEmpty else { return live }
 
         let issue = UsageIssue(
-            kind: .quotaLimitsUnavailable,
-            title: "Live \(live.provider.displayName) limits unavailable",
-            message: "Showing the last locally captured quota. It may not include usage from another device.",
-            recoverySuggestion: "Check your provider sign-in and network connection, then refresh."
+            kind: live.issue?.kind ?? .quotaLimitsUnavailable,
+            title: live.issue?.title ?? "Live \(live.provider.displayName) limits unavailable",
+            message: [
+                "Showing the last locally captured quota. It may not include usage from another device.",
+                live.issue?.message
+            ].compactMap { $0 }.joined(separator: " "),
+            recoverySuggestion: live.issue?.recoverySuggestion
+                ?? "Check your provider sign-in and network connection, then refresh."
         )
         return UsageSnapshot(
             provider: local.provider,

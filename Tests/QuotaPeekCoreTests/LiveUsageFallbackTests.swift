@@ -28,7 +28,29 @@ struct LiveUsageFallbackTests {
         #expect(selected.source == .localCapture)
         #expect(selected.windows.first?.usedPercent == 42)
         #expect(selected.updatedAt == local.updatedAt)
-        #expect(selected.issue?.title == "Live Claude Code limits unavailable")
+        #expect(selected.issue?.title == "Live Claude limits unavailable")
+    }
+
+    @Test("Retains a live provider failure's reason and recovery guidance")
+    func preservesLiveFailureGuidance() {
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        let local = snapshot(provider: .claude, percent: 42, at: now.addingTimeInterval(-90))
+        let liveIssue = UsageIssue(
+            kind: .unsupportedFormat,
+            title: "Claude Code credential format is unsupported",
+            message: "QuotaPeek cannot read this Claude Code credential format.",
+            recoverySuggestion: "Update Claude Code, then refresh QuotaPeek."
+        )
+        let live = UsageSnapshot(provider: .claude, health: .needsAttention, issue: liveIssue)
+
+        let selected = LiveUsageFallback.select(live: live, local: local, now: now)
+
+        #expect(selected.health == .limited)
+        #expect(selected.issue?.kind == .unsupportedFormat)
+        #expect(selected.issue?.title == liveIssue.title)
+        #expect(selected.issue?.message.contains("locally captured quota") == true)
+        #expect(selected.issue?.message.contains(liveIssue.message) == true)
+        #expect(selected.issue?.recoverySuggestion == liveIssue.recoverySuggestion)
     }
 
     @Test("Never falls back to an expired local quota window")
