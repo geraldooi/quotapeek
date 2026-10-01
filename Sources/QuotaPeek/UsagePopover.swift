@@ -268,11 +268,12 @@ private struct ProviderCard: View {
                 }
                 .padding(.vertical, 8)
             } else {
-                ForEach(Array(snapshot.windows.enumerated()), id: \.offset) { index, window in
+                ForEach(Array(snapshot.windows.enumerated()), id: \.offset) { _, window in
                     UsageWindowRow(
                         window: window,
                         tint: tint,
-                        resetForecast: index == snapshot.windows.count - 1 ? resetForecast : nil
+                        resetForecast: resetForecast?.isRelevant(to: window) == true
+                            ? resetForecast : nil
                     )
                 }
 
