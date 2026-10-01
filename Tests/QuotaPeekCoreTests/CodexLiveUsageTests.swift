@@ -33,6 +33,23 @@ struct CodexLiveUsageTests {
         #expect(snapshot.updatedAt == now)
     }
 
+    @Test("Keeps a reported percentage when Codex provides a null duration")
+    func preservesWindowWithNullDuration() throws {
+        let data = try #require(
+            #"{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":42,"windowDurationMins":null,"resetsAt":1800000100}}}}"#
+                .data(using: .utf8)
+        )
+
+        let snapshot = CodexLiveUsageReader.parse(data: data, now: now)
+
+        #expect(snapshot.health == .ready)
+        #expect(snapshot.windows.count == 1)
+        #expect(snapshot.windows.first?.kind == .other)
+        #expect(snapshot.windows.first?.label == "Quota window")
+        #expect(snapshot.windows.first?.usedPercent == 42)
+        #expect(snapshot.windows.first?.resetAt == Date(timeIntervalSince1970: 1_800_000_100))
+    }
+
     @Test("Rejects invalid percentages and reports unavailable limits")
     func rejectsInvalidValues() throws {
         let data = try #require(#"{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":101,"windowDurationMins":300,"resetsAt":0}}}}"#.data(using: .utf8))

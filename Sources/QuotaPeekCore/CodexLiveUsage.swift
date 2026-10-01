@@ -218,29 +218,41 @@ public struct CodexLiveUsageReader {
         var windows: [UsageWindow] = []
         for key in ["primary", "secondary"] {
             guard let value = source[key] as? [String: Any],
-                  let duration = number(value["windowDurationMins"]),
-                  duration.isFinite,
-                  duration > 0,
-                  duration <= 10_000_000,
-                  duration.rounded() == duration,
                   let used = number(value["usedPercent"]),
                   used.isFinite,
                   (0...100).contains(used)
             else { continue }
 
+            let duration: Double?
+            if let rawDuration = value["windowDurationMins"], !(rawDuration is NSNull) {
+                guard let parsed = number(rawDuration),
+                      parsed.isFinite,
+                      parsed > 0,
+                      parsed <= 10_000_000,
+                      parsed.rounded() == parsed else { continue }
+                duration = parsed
+            } else {
+                duration = nil
+            }
+
             let kind: UsageWindowKind
             let label: String
-            let durationMinutes = Int(duration)
-            switch durationMinutes {
-            case 300:
-                kind = .fiveHour
-                label = "5 hours"
-            case 10_080:
-                kind = .weekly
-                label = "7 days"
-            default:
+            if let duration {
+                let durationMinutes = Int(duration)
+                switch durationMinutes {
+                case 300:
+                    kind = .fiveHour
+                    label = "5 hours"
+                case 10_080:
+                    kind = .weekly
+                    label = "7 days"
+                default:
+                    kind = .other
+                    label = duration >= 60 ? "\(durationMinutes / 60) hours" : "\(durationMinutes) minutes"
+                }
+            } else {
                 kind = .other
-                label = duration >= 60 ? "\(durationMinutes / 60) hours" : "\(durationMinutes) minutes"
+                label = "Quota window"
             }
 
             let resetAt = number(value["resetsAt"]).flatMap { seconds -> Date? in
