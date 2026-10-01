@@ -89,4 +89,14 @@ struct CodexResetForecastTests {
                 == "Unofficial estimate: 53 percent chance of a Codex quota reset in the next 48 hours"
         )
     }
+
+    @Test("Associates the forecast only with Codex's weekly usage window")
+    func associatesWithWeeklyWindow() {
+        let forecast = CodexResetForecast(score: 53, fetchedAt: Date())
+        let fiveHour = UsageWindow(kind: .fiveHour, label: "5 hours", usedPercent: 12)
+        let weekly = UsageWindow(kind: .weekly, label: "7 days", usedPercent: 37.5)
+
+        #expect(!forecast.isRelevant(to: fiveHour))
+        #expect(forecast.isRelevant(to: weekly))
+    }
 }
