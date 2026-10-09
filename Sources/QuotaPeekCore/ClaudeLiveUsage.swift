@@ -78,13 +78,14 @@ public struct ClaudeLiveUsageReader: Sendable {
                 recoverySuggestion: "Check the network connection, then refresh QuotaPeek."
             )
         }
-        guard (200..<300).contains(httpResponse.statusCode), let responseData else {
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            return unavailable(issue: Self.issue(forHTTPStatus: httpResponse.statusCode))
+        }
+        guard let responseData else {
             return unavailable(
-                title: httpResponse.statusCode == 401 || httpResponse.statusCode == 403
-                    ? "Claude live quota authorization expired"
-                    : "Claude live quota could not be read",
+                title: "Claude live quota could not be read",
                 message: "Claude's official usage endpoint did not return usable quota data.",
-                recoverySuggestion: "Use Claude Code again to refresh authorization, then refresh QuotaPeek."
+                recoverySuggestion: "Refresh QuotaPeek to try again."
             )
         }
 
@@ -223,19 +224,59 @@ public struct ClaudeLiveUsageReader: Sendable {
 
     static func keychainServices(configDirectory: URL?) -> [String] {
         let base = "Claude Code-credentials"
+        let selected = configDirectory ?? defaultConfigDirectory
         let configured = ProcessInfo.processInfo.environment["CLAUDE_SECURESTORAGE_CONFIG_DIR"]
             ?? ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"]
             ?? configDirectory?.path
             ?? defaultConfigDirectory.path
         let expanded = (configured as NSString).expandingTildeInPath
+        let legacyDirectory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude", isDirectory: true).path
+        let includeLegacyServices = (expanded as NSString).standardizingPath == legacyDirectory
+            && (selected.path as NSString).standardizingPath == legacyDirectory
         #if canImport(CryptoKit)
         let digest = SHA256.hash(data: Data(expanded.precomposedStringWithCanonicalMapping.utf8))
             .map { String(format: "%02x", $0) }
             .joined()
-        return ["\(base)-\(digest.prefix(8))", base, "Claude Code"]
+        let hashedService = "\(base)-\(digest.prefix(8))"
+        return includeLegacyServices ? [hashedService, base, "Claude Code"] : [hashedService]
         #else
-        return [base, "Claude Code"]
+        return includeLegacyServices ? [base, "Claude Code"] : []
         #endif
+    }
+
+    static func issue(forHTTPStatus statusCode: Int) -> UsageIssue {
+        let title: String
+        let recoverySuggestion: String
+        switch statusCode {
+        case 401, 403:
+            title = "Claude live quota authorization expired"
+            recoverySuggestion = "Use Claude Code again to refresh authorization, then refresh QuotaPeek."
+        case 429:
+            title = "Claude live quota is temporarily rate limited"
+            recoverySuggestion = "Wait briefly, then refresh QuotaPeek."
+        case 500..<600:
+            title = "Claude live quota service is temporarily unavailable"
+            recoverySuggestion = "Try again later, then refresh QuotaPeek."
+        default:
+            title = "Claude live quota could not be read"
+            recoverySuggestion = "Refresh QuotaPeek to try again."
+        }
+        return UsageIssue(
+            kind: .readError,
+            title: title,
+            message: "Claude's official usage endpoint did not return usable quota data.",
+            recoverySuggestion: recoverySuggestion
+        )
+    }
+
+    private func unavailable(issue: UsageIssue) -> UsageSnapshot {
+        unavailable(
+            kind: issue.kind,
+            title: issue.title,
+            message: issue.message,
+            recoverySuggestion: issue.recoverySuggestion
+        )
     }
 
     private func unavailable(

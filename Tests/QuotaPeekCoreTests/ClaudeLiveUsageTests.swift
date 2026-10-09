@@ -68,12 +68,39 @@ struct ClaudeLiveUsageTests {
         #expect(ClaudeLiveUsageReader.parse(data: payload, now: now) == nil)
     }
 
-    @Test("Searches current hashed Claude Code Keychain services")
-    func includesHashedKeychainService() {
+    @Test("Scopes custom Claude Code profiles to their hashed Keychain service")
+    func scopesCustomProfileKeychainService() {
         let services = ClaudeLiveUsageReader.keychainServices(
             configDirectory: URL(fileURLWithPath: "/tmp/claude-profile")
         )
         #expect(services.first?.hasPrefix("Claude Code-credentials-") == true)
+        #expect(!services.contains("Claude Code-credentials"))
+        #expect(!services.contains("Claude Code"))
+    }
+
+    @Test("Keeps legacy Keychain services for the default Claude Code profile")
+    func keepsDefaultProfileLegacyServices() {
+        let defaultDirectory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude", isDirectory: true)
+        let services = ClaudeLiveUsageReader.keychainServices(configDirectory: defaultDirectory)
+        #expect(services.first?.hasPrefix("Claude Code-credentials-") == true)
         #expect(services.contains("Claude Code-credentials"))
+        #expect(services.contains("Claude Code"))
+    }
+
+    @Test("Uses authorization guidance only for Claude authentication failures")
+    func classifiesHTTPFailures() {
+        for statusCode in [401, 403] {
+            let issue = ClaudeLiveUsageReader.issue(forHTTPStatus: statusCode)
+            #expect(issue.title == "Claude live quota authorization expired")
+            #expect(issue.recoverySuggestion.contains("authorization"))
+        }
+        for statusCode in [429, 500, 503, 400] {
+            let issue = ClaudeLiveUsageReader.issue(forHTTPStatus: statusCode)
+            #expect(issue.title != "Claude live quota authorization expired")
+            #expect(!issue.recoverySuggestion.contains("authorization"))
+        }
+        #expect(ClaudeLiveUsageReader.issue(forHTTPStatus: 429).recoverySuggestion.contains("Wait"))
+        #expect(ClaudeLiveUsageReader.issue(forHTTPStatus: 503).recoverySuggestion.contains("later"))
     }
 }
