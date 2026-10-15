@@ -218,8 +218,7 @@ public struct ClaudeLiveUsageReader: Sendable {
         }
         #endif
 
-        let url = credentialsURL ?? (configDirectory ?? Self.defaultConfigDirectory)
-            .appendingPathComponent(".credentials.json")
+        let url = credentialsURL ?? Self.credentialsFileURL(configDirectory: configDirectory)
         guard let data = try? Data(contentsOf: url) else { return nil }
         return Self.token(from: data)
     }
@@ -237,34 +236,44 @@ public struct ClaudeLiveUsageReader: Sendable {
         return token
     }
 
-    private static var defaultConfigDirectory: URL {
-        if let configured = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"], !configured.isEmpty {
-            return URL(fileURLWithPath: configured, isDirectory: true)
-        }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude", isDirectory: true)
-    }
-
-    static func keychainServices(configDirectory: URL?) -> [String] {
+    static func keychainServices(
+        configDirectory: URL?,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> [String] {
         let base = "Claude Code-credentials"
-        let selected = configDirectory ?? defaultConfigDirectory
-        let configured = ProcessInfo.processInfo.environment["CLAUDE_SECURESTORAGE_CONFIG_DIR"]
-            ?? ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"]
-            ?? configDirectory?.path
-            ?? defaultConfigDirectory.path
-        let expanded = (configured as NSString).expandingTildeInPath
-        let legacyDirectory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude", isDirectory: true).path
-        let includeLegacyServices = (expanded as NSString).standardizingPath == legacyDirectory
-            && (selected.path as NSString).standardizingPath == legacyDirectory
+        guard let selector = credentialSelector(configDirectory: configDirectory, environment: environment),
+              !selector.isEmpty else { return [base] }
         #if canImport(CryptoKit)
-        let digest = SHA256.hash(data: Data(expanded.precomposedStringWithCanonicalMapping.utf8))
+        let digest = SHA256.hash(data: Data(selector.precomposedStringWithCanonicalMapping.utf8))
             .map { String(format: "%02x", $0) }
             .joined()
-        let hashedService = "\(base)-\(digest.prefix(8))"
-        return includeLegacyServices ? [hashedService, base, "Claude Code"] : [hashedService]
+        return ["\(base)-\(digest.prefix(8))"]
         #else
-        return includeLegacyServices ? [base, "Claude Code"] : []
+        return []
         #endif
+    }
+
+    static func credentialsFileURL(
+        configDirectory: URL?,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        let selector = credentialSelector(configDirectory: configDirectory, environment: environment)
+        let directory: URL
+        if let selector, !selector.isEmpty {
+            directory = URL(fileURLWithPath: selector, isDirectory: true)
+        } else {
+            directory = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".claude", isDirectory: true)
+        }
+        return directory.appendingPathComponent(".credentials.json")
+    }
+
+    private static func credentialSelector(configDirectory: URL?, environment: [String: String]) -> String? {
+        // An explicitly empty secure-storage selector pins Claude's default store.
+        // Nonempty selectors are hashed verbatim (NFC), without expanding paths.
+        environment["CLAUDE_SECURESTORAGE_CONFIG_DIR"]
+            ?? environment["CLAUDE_CONFIG_DIR"]
+            ?? configDirectory?.path
     }
 
     static func issue(forHTTPStatus statusCode: Int) -> UsageIssue {

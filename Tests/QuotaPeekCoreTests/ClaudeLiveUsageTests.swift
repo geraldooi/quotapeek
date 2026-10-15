@@ -71,21 +71,43 @@ struct ClaudeLiveUsageTests {
     @Test("Scopes custom Claude Code profiles to their hashed Keychain service")
     func scopesCustomProfileKeychainService() {
         let services = ClaudeLiveUsageReader.keychainServices(
-            configDirectory: URL(fileURLWithPath: "/tmp/claude-profile")
+            configDirectory: URL(fileURLWithPath: "/tmp/claude-profile"),
+            environment: [:]
         )
         #expect(services.first?.hasPrefix("Claude Code-credentials-") == true)
         #expect(!services.contains("Claude Code-credentials"))
         #expect(!services.contains("Claude Code"))
     }
 
-    @Test("Keeps legacy Keychain services for the default Claude Code profile")
-    func keepsDefaultProfileLegacyServices() {
-        let defaultDirectory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude", isDirectory: true)
-        let services = ClaudeLiveUsageReader.keychainServices(configDirectory: defaultDirectory)
-        #expect(services.first?.hasPrefix("Claude Code-credentials-") == true)
-        #expect(services.contains("Claude Code-credentials"))
-        #expect(services.contains("Claude Code"))
+    @Test("Uses only the active base Keychain service for unset or empty selectors")
+    func selectsDefaultCredentialStore() {
+        #expect(ClaudeLiveUsageReader.keychainServices(configDirectory: nil, environment: [:])
+            == ["Claude Code-credentials"])
+        let pinnedDefault = ["CLAUDE_SECURESTORAGE_CONFIG_DIR": "", "CLAUDE_CONFIG_DIR": "/tmp/other-profile"]
+        #expect(ClaudeLiveUsageReader.keychainServices(configDirectory: nil, environment: pinnedDefault)
+            == ["Claude Code-credentials"])
+    }
+
+    @Test("Hashes nonempty secure-storage selectors without expanding paths")
+    func preservesVerbatimCredentialSelector() {
+        let environment = ["CLAUDE_SECURESTORAGE_CONFIG_DIR": "~/.claude", "CLAUDE_CONFIG_DIR": "/tmp/other-profile"]
+        #expect(ClaudeLiveUsageReader.keychainServices(configDirectory: nil, environment: environment)
+            == ["Claude Code-credentials-37e4f761"])
+        let explicitDefault = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude")
+        #expect(ClaudeLiveUsageReader.keychainServices(configDirectory: explicitDefault, environment: [:])
+            != ["Claude Code-credentials"])
+    }
+
+    @Test("Credential files follow the secure-storage selector and empty-string pin")
+    func selectsCredentialFileFromSameStore() {
+        let environment = ["CLAUDE_SECURESTORAGE_CONFIG_DIR": "/tmp/selected-profile", "CLAUDE_CONFIG_DIR": "/tmp/other-profile"]
+        #expect(ClaudeLiveUsageReader.credentialsFileURL(configDirectory: nil, environment: environment).path
+            == "/tmp/selected-profile/.credentials.json")
+        let pinnedDefault = ["CLAUDE_SECURESTORAGE_CONFIG_DIR": "", "CLAUDE_CONFIG_DIR": "/tmp/other-profile"]
+        let defaultFile = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/.credentials.json")
+        #expect(ClaudeLiveUsageReader.credentialsFileURL(configDirectory: nil, environment: pinnedDefault)
+            == defaultFile)
     }
 
     @Test("Uses authorization guidance only for Claude authentication failures")
