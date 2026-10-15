@@ -215,6 +215,23 @@ public struct CodexLiveUsageReader {
         }
         guard let source else { return nil }
 
+        let ordinaryUsageBlocked: Bool
+        if let ordinaryUsageAllowed = response["ordinaryUsageAllowed"] {
+            ordinaryUsageBlocked = (ordinaryUsageAllowed as? Bool) != true
+        } else {
+            ordinaryUsageBlocked = false
+        }
+        let rateLimitBlocked = source["rateLimitReachedType"] as? String != nil
+        let spendControlBlocked = (source["spendControlReached"] as? Bool) == true
+        let limitedIssue = (ordinaryUsageBlocked || rateLimitBlocked || spendControlBlocked)
+            ? UsageIssue(
+                kind: .quotaLimitsUnavailable,
+                title: "Codex usage is limited",
+                message: "Codex reported that ordinary usage is currently unavailable.",
+                recoverySuggestion: "Check Codex account limits, then refresh QuotaPeek."
+            )
+            : nil
+
         var windows: [UsageWindow] = []
         for key in ["primary", "secondary"] {
             guard let value = source[key] as? [String: Any],
@@ -262,8 +279,16 @@ public struct CodexLiveUsageReader {
             windows.append(UsageWindow(kind: kind, label: label, usedPercent: used, resetAt: resetAt))
         }
 
-        guard !windows.isEmpty else { return nil }
-        return UsageSnapshot(provider: .codex, source: .live, health: .ready, windows: windows, updatedAt: now)
+        guard !windows.isEmpty || limitedIssue != nil else { return nil }
+
+        return UsageSnapshot(
+            provider: .codex,
+            source: .live,
+            health: limitedIssue == nil ? .ready : .limited,
+            issue: limitedIssue,
+            windows: windows,
+            updatedAt: now
+        )
     }
 
     private static func number(_ value: Any?) -> Double? {

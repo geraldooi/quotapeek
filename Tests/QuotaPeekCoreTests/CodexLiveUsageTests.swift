@@ -75,6 +75,53 @@ struct CodexLiveUsageTests {
         #expect(CodexLiveUsageReader.parse(data: invalid, now: now).windows.isEmpty)
     }
 
+    @Test("Preserves windows but marks explicitly blocked ordinary usage limited")
+    func reportsOrdinaryUsageBlocked() throws {
+        let data = try #require(#"{"id":2,"result":{"ordinaryUsageAllowed":false,"rateLimits":{"primary":{"usedPercent":42,"windowDurationMins":300}}}}"#.data(using: .utf8))
+        let snapshot = CodexLiveUsageReader.parse(data: data, now: now)
+        #expect(snapshot.health == .limited)
+        #expect(snapshot.windows.count == 1)
+        #expect(snapshot.issue?.kind == .quotaLimitsUnavailable)
+    }
+
+    @Test("Treats ordinary usage permission as tri-state")
+    func distinguishesUnavailableOrdinaryUsagePermission() throws {
+        let absent = try #require(#"{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":42,"windowDurationMins":300}}}}"#.data(using: .utf8))
+        let allowed = try #require(#"{"id":2,"result":{"ordinaryUsageAllowed":true,"rateLimits":{"primary":{"usedPercent":42,"windowDurationMins":300}}}}"#.data(using: .utf8))
+        let unavailable = try #require(#"{"id":2,"result":{"ordinaryUsageAllowed":null,"rateLimits":{"primary":{"usedPercent":42,"windowDurationMins":300}}}}"#.data(using: .utf8))
+
+        #expect(CodexLiveUsageReader.parse(data: absent, now: now).health == .ready)
+        #expect(CodexLiveUsageReader.parse(data: allowed, now: now).health == .ready)
+        #expect(CodexLiveUsageReader.parse(data: unavailable, now: now).health == .limited)
+    }
+
+    @Test("Surfaces a reported block even when no quota windows are usable")
+    func reportsBlockWithoutWindows() throws {
+        let data = try #require(#"{"id":2,"result":{"ordinaryUsageAllowed":false,"rateLimits":{}}}"#.data(using: .utf8))
+        let snapshot = CodexLiveUsageReader.parse(data: data, now: now)
+        #expect(snapshot.health == .limited)
+        #expect(snapshot.windows.isEmpty)
+        #expect(snapshot.issue?.kind == .quotaLimitsUnavailable)
+    }
+
+    @Test("Preserves windows but marks a reported rate-limit block limited")
+    func reportsRateLimitBlocked() throws {
+        let data = try #require(#"{"id":2,"result":{"rateLimits":{"rateLimitReachedType":"rate_limit_reached","primary":{"usedPercent":42,"windowDurationMins":300}}}}"#.data(using: .utf8))
+        let snapshot = CodexLiveUsageReader.parse(data: data, now: now)
+        #expect(snapshot.health == .limited)
+        #expect(snapshot.windows.count == 1)
+        #expect(snapshot.issue?.kind == .quotaLimitsUnavailable)
+    }
+
+    @Test("Preserves windows but marks a reported spend-control block limited")
+    func reportsSpendControlBlocked() throws {
+        let data = try #require(#"{"id":2,"result":{"rateLimits":{"spendControlReached":true,"primary":{"usedPercent":42,"windowDurationMins":300}}}}"#.data(using: .utf8))
+        let snapshot = CodexLiveUsageReader.parse(data: data, now: now)
+        #expect(snapshot.health == .limited)
+        #expect(snapshot.windows.count == 1)
+        #expect(snapshot.issue?.kind == .quotaLimitsUnavailable)
+    }
+
     @Test("Completes the app-server request sequence")
     func readsAppServer() throws {
         let directory = FileManager.default.temporaryDirectory

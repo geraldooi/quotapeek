@@ -103,4 +103,25 @@ struct ClaudeLiveUsageTests {
         #expect(ClaudeLiveUsageReader.issue(forHTTPStatus: 429).recoverySuggestion.contains("Wait"))
         #expect(ClaudeLiveUsageReader.issue(forHTTPStatus: 503).recoverySuggestion.contains("later"))
     }
+
+    @Test("Parses Retry-After delta seconds without truncating long backoffs")
+    func parsesRetryAfterSeconds() {
+        let retryAt = ClaudeLiveUsageReader.retryAfterDate(from: "900", now: now)
+        #expect(retryAt == now.addingTimeInterval(900))
+        #expect(ClaudeLiveUsageReader.retryAfterDate(from: "-1", now: now) == nil)
+        #expect(ClaudeLiveUsageReader.retryAfterDate(from: "not-a-date", now: now) == nil)
+    }
+
+    @Test("Parses future HTTP-date Retry-After values")
+    func parsesRetryAfterHTTPDate() {
+        let retryAt = ClaudeLiveUsageReader.retryAfterDate(
+            from: "Fri, 16 Jan 2027 08:00:00 GMT",
+            now: now
+        )
+        #expect(retryAt == Date(timeIntervalSince1970: 1_800_086_400))
+        #expect(ClaudeLiveUsageReader.retryAfterDate(
+            from: "Fri, 16 Jan 2020 08:00:00 GMT",
+            now: now
+        ) == nil)
+    }
 }

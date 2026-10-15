@@ -23,6 +23,7 @@ final class AppState: ObservableObject {
     private var releaseRefreshAfter = Date.distantPast
     private var codexLiveLimitsRefreshAfter = Date.distantPast
     private var claudeLiveLimitsRefreshAfter = Date.distantPast
+    private var claudeRetryAfter: Date?
     private var codexLiveLimits: UsageSnapshot?
     private var claudeLiveLimits: UsageSnapshot?
     private let defaults: UserDefaults
@@ -130,11 +131,12 @@ final class AppState: ObservableObject {
                 at: liveReadStartedAt,
                 deadline: codexLiveLimitsRefreshAfter
             )
-        let shouldRefreshClaudeLiveLimits = announcesCompletion
-            || LiveUsageRefreshSchedule.shouldRead(
-                at: liveReadStartedAt,
-                deadline: claudeLiveLimitsRefreshAfter
-            )
+        let shouldRefreshClaudeLiveLimits = LiveUsageRefreshSchedule.shouldRead(
+            at: liveReadStartedAt,
+            deadline: claudeLiveLimitsRefreshAfter,
+            manuallyRequested: announcesCompletion,
+            retryAfter: claudeRetryAfter
+        )
         let previousCodexLiveLimits = codexLiveLimits
         let previousClaudeLiveLimits = claudeLiveLimits
         let currentVersion = AppVersion.current
@@ -161,16 +163,17 @@ final class AppState: ObservableObject {
                 : nil
             let claudeTask = visibility.showsClaude
                 ? Task.detached(priority: .utility) {
-                    let live = shouldRefreshClaudeLiveLimits
-                        ? ClaudeLiveUsageReader().load()
-                        : (previousClaudeLiveLimits ?? ClaudeLiveUsageReader().load())
-                    let local = live.isAvailable
+                    let liveResult = shouldRefreshClaudeLiveLimits
+                        ? ClaudeLiveUsageReader().loadResult()
+                        : nil
+                    let live = liveResult?.snapshot ?? previousClaudeLiveLimits
+                    let local = live?.isAvailable == true
                         ? nil
                         : ClaudeQuotaReader(
                             cacheURL: claudeCacheURL,
                             integrationEnabled: claudeIntegrationEnabled
                         ).load()
-                    return (live, local)
+                    return (live, local, liveResult?.retryAfter)
                 }
                 : nil
 
@@ -183,14 +186,19 @@ final class AppState: ObservableObject {
                     )
                 }
             }
-            if let (live, local) = await claudeTask?.value,
-               claudeIntegrationEnabled == isClaudeQuotaIntegrationEnabled,
-               claudeQuotaRetryTarget == nil {
-                claudeLiveLimits = live
-                claude = local.map { LiveUsageFallback.select(live: live, local: $0) } ?? live
+            if let (live, local, retryAfter) = await claudeTask?.value {
+                if let live {
+                    claudeLiveLimits = live
+                    if claudeIntegrationEnabled == isClaudeQuotaIntegrationEnabled,
+                       claudeQuotaRetryTarget == nil {
+                        claude = local.map { LiveUsageFallback.select(live: live, local: $0) } ?? live
+                    }
+                }
                 if shouldRefreshClaudeLiveLimits {
-                    claudeLiveLimitsRefreshAfter = LiveUsageRefreshSchedule.nextRead(
-                        after: liveReadStartedAt
+                    claudeRetryAfter = retryAfter
+                    claudeLiveLimitsRefreshAfter = max(
+                        LiveUsageRefreshSchedule.nextRead(after: liveReadStartedAt),
+                        retryAfter ?? .distantPast
                     )
                 }
             }

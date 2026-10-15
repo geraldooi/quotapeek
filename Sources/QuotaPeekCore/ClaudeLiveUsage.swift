@@ -9,6 +9,16 @@ import CryptoKit
 
 /// Reads Claude Code's official account usage endpoint without persisting credentials.
 public struct ClaudeLiveUsageReader: Sendable {
+    public struct LoadResult: Sendable {
+        public let snapshot: UsageSnapshot
+        public let retryAfter: Date?
+
+        public init(snapshot: UsageSnapshot, retryAfter: Date? = nil) {
+            self.snapshot = snapshot
+            self.retryAfter = retryAfter
+        }
+    }
+
     public static let usageEndpoint = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
     private let credentialsURL: URL?
@@ -27,14 +37,19 @@ public struct ClaudeLiveUsageReader: Sendable {
 
     /// Loads a current snapshot synchronously so callers can invoke it from a detached task.
     public func load() -> UsageSnapshot {
+        loadResult().snapshot
+    }
+
+    /// Loads a snapshot and preserves a provider-supplied retry deadline, when present.
+    public func loadResult() -> LoadResult {
         let currentDate = now()
         guard let token = accessToken() else {
-            return unavailable(
+            return LoadResult(snapshot: unavailable(
                 health: .inactive,
                 title: "Claude live quota is unavailable",
                 message: "Claude Code credentials were not available to read its official usage.",
                 recoverySuggestion: "Use Claude Code once, then refresh QuotaPeek."
-            )
+            ))
         }
 
         var request = URLRequest(url: Self.usageEndpoint)
@@ -63,41 +78,48 @@ public struct ClaudeLiveUsageReader: Sendable {
         if semaphore.wait(timeout: .now() + 20) == .timedOut {
             task.cancel()
             session.invalidateAndCancel()
-            return unavailable(
+            return LoadResult(snapshot: unavailable(
                 title: "Claude live quota could not be read",
                 message: "QuotaPeek timed out while contacting Claude's official usage endpoint.",
                 recoverySuggestion: "Check the network connection, then refresh QuotaPeek."
-            )
+            ))
         }
         session.finishTasksAndInvalidate()
+        let responseReceivedAt = now()
 
         guard responseError == nil, let httpResponse = response as? HTTPURLResponse else {
-            return unavailable(
+            return LoadResult(snapshot: unavailable(
                 title: "Claude live quota could not be read",
                 message: "QuotaPeek could not reach Claude's official usage endpoint.",
                 recoverySuggestion: "Check the network connection, then refresh QuotaPeek."
-            )
+            ))
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            return unavailable(issue: Self.issue(forHTTPStatus: httpResponse.statusCode))
+            return LoadResult(
+                snapshot: unavailable(issue: Self.issue(forHTTPStatus: httpResponse.statusCode)),
+                retryAfter: Self.retryAfterDate(
+                    from: httpResponse.value(forHTTPHeaderField: "Retry-After"),
+                    now: responseReceivedAt
+                )
+            )
         }
         guard let responseData else {
-            return unavailable(
+            return LoadResult(snapshot: unavailable(
                 title: "Claude live quota could not be read",
                 message: "Claude's official usage endpoint did not return usable quota data.",
                 recoverySuggestion: "Refresh QuotaPeek to try again."
-            )
+            ))
         }
 
         guard let snapshot = Self.parse(data: responseData, now: currentDate) else {
-            return unavailable(
+            return LoadResult(snapshot: unavailable(
                 kind: .unsupportedFormat,
                 title: "Claude live quota data is invalid",
                 message: "Claude supplied usage data in an unexpected format.",
                 recoverySuggestion: "Update Claude Code, then refresh QuotaPeek."
-            )
+            ))
         }
-        return snapshot
+        return LoadResult(snapshot: snapshot)
     }
 
     /// Parses the documented usage response without reading credentials or making a request.
@@ -268,6 +290,36 @@ public struct ClaudeLiveUsageReader: Sendable {
             message: "Claude's official usage endpoint did not return usable quota data.",
             recoverySuggestion: recoverySuggestion
         )
+    }
+
+    /// Parses the HTTP Retry-After field as delta-seconds or an HTTP date.
+    /// Invalid, negative, or already elapsed values are ignored.
+    public static func retryAfterDate(from value: String?, now: Date = Date()) -> Date? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if trimmed.allSatisfy({ $0.isASCII && $0.isNumber }),
+           let seconds = Int64(trimmed) {
+            let interval = TimeInterval(seconds)
+            guard interval.isFinite else { return nil }
+            return now.addingTimeInterval(interval)
+        }
+
+        let formatters = [
+            "EEE, dd MMM yyyy HH:mm:ss zzz",
+            "EEEE, dd-MMM-yy HH:mm:ss zzz",
+            "EEE MMM d HH:mm:ss yyyy"
+        ].map { format in
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.dateFormat = format
+            return formatter
+        }
+        guard let date = formatters.lazy.compactMap({ $0.date(from: trimmed) }).first,
+              date >= now else { return nil }
+        return date
     }
 
     private func unavailable(issue: UsageIssue) -> UsageSnapshot {

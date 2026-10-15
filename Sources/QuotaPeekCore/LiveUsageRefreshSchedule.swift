@@ -7,7 +7,13 @@ public enum LiveUsageRefreshSchedule {
         startedAt.addingTimeInterval(3 * 60 + 30)
     }
 
-    public static func shouldRead(at now: Date, deadline: Date) -> Bool {
-        now >= deadline
+    public static func shouldRead(
+        at now: Date,
+        deadline: Date,
+        manuallyRequested: Bool = false,
+        retryAfter: Date? = nil
+    ) -> Bool {
+        guard retryAfter.map({ now >= $0 }) ?? true else { return false }
+        return manuallyRequested || now >= deadline
     }
 }
