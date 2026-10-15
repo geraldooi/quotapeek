@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/geraldooi/quotapeek/compare/v0.8.0...v0.9.0) (2026-10-15)
+
+
+### Features
+
+* **usage:** prefer live Codex and Claude limits ([ea70968](https://github.com/geraldooi/quotapeek/commit/ea709688c25ceb7c178b3027193f01e585f4fef5))
+
 ## [0.8.0](https://github.com/geraldooi/quotapeek/compare/v0.7.0...v0.8.0) (2026-09-10)
 
 
