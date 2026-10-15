@@ -20,6 +20,11 @@ public enum UsageHealth: Equatable, Sendable {
     case needsAttention
 }
 
+public enum UsageSnapshotSource: Equatable, Sendable {
+    case localCapture
+    case live
+}
+
 public enum UsageIssueKind: String, Equatable, Sendable {
     case dataFolderNotFound
     case noRecentActivity
@@ -151,6 +156,7 @@ public struct UsageWindow: Equatable, Sendable {
 
 public struct UsageSnapshot: Equatable, Sendable {
     public let provider: Provider
+    public let source: UsageSnapshotSource
     public let health: UsageHealth
     public let issue: UsageIssue?
     public let diagnostics: UsageDiagnostics?
@@ -161,6 +167,7 @@ public struct UsageSnapshot: Equatable, Sendable {
 
     public init(
         provider: Provider,
+        source: UsageSnapshotSource = .localCapture,
         health: UsageHealth = .ready,
         issue: UsageIssue? = nil,
         diagnostics: UsageDiagnostics? = nil,
@@ -170,6 +177,7 @@ public struct UsageSnapshot: Equatable, Sendable {
         updatedAt: Date? = nil
     ) {
         self.provider = provider
+        self.source = source
         self.health = health
         self.issue = issue
         self.diagnostics = diagnostics
@@ -211,6 +219,7 @@ public struct UsageSnapshot: Equatable, Sendable {
     public func attaching(diagnostics: UsageDiagnostics) -> UsageSnapshot {
         UsageSnapshot(
             provider: provider,
+            source: source,
             health: health,
             issue: issue,
             diagnostics: diagnostics,
@@ -224,6 +233,7 @@ public struct UsageSnapshot: Equatable, Sendable {
     public func reporting(health: UsageHealth, issue: UsageIssue) -> UsageSnapshot {
         UsageSnapshot(
             provider: provider,
+            source: source,
             health: health,
             issue: issue,
             diagnostics: diagnostics,

@@ -19,6 +19,10 @@ public struct CodexResetForecast: Equatable, Sendable {
         "Unofficial estimate: \(score) percent chance of a Codex quota reset in the next 48 hours"
     }
 
+    public func isRelevant(to window: UsageWindow) -> Bool {
+        window.kind == .weekly
+    }
+
     public func isFresh(
         at date: Date = Date(),
         maxAge: TimeInterval = 2 * 60 * 60

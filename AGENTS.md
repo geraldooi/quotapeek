@@ -11,12 +11,17 @@
 ## Product boundaries
 
 - Keep QuotaPeek a lightweight, read-only, glanceable macOS menu-bar utility.
-- Do not add account login, credential access, prompt or response collection,
-  analytics, or historical dashboards without explicit product approval.
+- Do not add account login, prompt or response collection, analytics, or
+  historical dashboards without explicit product approval. Claude credential
+  access is approved only for reading the existing local credential and
+  requesting live limits directly from Anthropic; never copy or store the
+  credential on a QuotaPeek or other third-party server.
 - Report only usage that a provider's source can support. Do not invent a
   quota percentage to make providers look symmetrical.
-- New network integrations must send no local usage data, prompt content,
-  credentials, or user identifiers. Disclose every integration in `README.md`.
+- New network integrations must send no local usage data, prompt content, or
+  separate user identifiers. The only approved credential-bearing request is
+  the Claude usage request to Anthropic. Disclose every integration in
+  `README.md`.
 - Preserve actionable unavailable, inactive, limited, and error states instead
   of silently presenting missing data as zero usage.
 - Preserve accessibility behavior, including VoiceOver labels and Reduce Motion.

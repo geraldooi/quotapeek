@@ -98,7 +98,7 @@ struct UsagePopover: View {
                 .buttonStyle(.plain)
                 .contentShape(Rectangle())
                 .help(
-                    "Check local usage sources. Claude quota changes after Claude Code receives a response."
+                    "Check current provider limits and local fallback data."
                 )
                 .accessibilityLabel(
                     state.isRefreshing ? "Checking quota usage" : "Check quota usage"
@@ -259,20 +259,21 @@ private struct ProviderCard: View {
                     ProgressView()
                         .controlSize(.small)
                         .accessibilityHidden(true)
-                    Text("Checking local usage…")
+                    Text("Checking quota usage…")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .accessibilityLabel(
-                            "Checking \(snapshot.provider.displayName) local usage"
+                            "Checking \(snapshot.provider.displayName) quota usage"
                         )
                 }
                 .padding(.vertical, 8)
             } else {
-                ForEach(Array(snapshot.windows.enumerated()), id: \.offset) { index, window in
+                ForEach(Array(snapshot.windows.enumerated()), id: \.offset) { _, window in
                     UsageWindowRow(
                         window: window,
                         tint: tint,
-                        resetForecast: index == snapshot.windows.count - 1 ? resetForecast : nil
+                        resetForecast: resetForecast?.isRelevant(to: window) == true
+                            ? resetForecast : nil
                     )
                 }
 
@@ -308,36 +309,15 @@ private struct ProviderStatusBadge: View {
     let snapshot: UsageSnapshot
 
     var body: some View {
-        Label(label, systemImage: icon)
+        Label(statusText.label, systemImage: icon)
             .font(.caption2.weight(.medium))
             .foregroundStyle(color)
-            .help(helpText)
-            .accessibilityLabel(accessibilityLabel)
+            .help(statusText.help)
+            .accessibilityLabel(statusText.accessibilityLabel)
     }
 
-    private var label: String {
-        if let freshness {
-            let captureLabel: String
-            switch freshness {
-            case .current: captureLabel = "Captured now"
-            case .unknown: captureLabel = "Unknown age"
-            case .aging, .stale:
-                captureLabel = UsageFormatting.age(
-                    since: snapshot.updatedAt ?? Date()
-                )
-            }
-            return snapshot.health == .limited
-                ? "Limited · \(captureLabel)"
-                : captureLabel
-        }
-
-        return switch snapshot.health {
-        case .loading: "Loading"
-        case .ready: "Working"
-        case .inactive: "Inactive"
-        case .limited: "Limited"
-        case .needsAttention: "Needs attention"
-        }
+    private var statusText: UsageStatusText {
+        snapshot.statusText()
     }
 
     private var icon: String {
@@ -379,22 +359,6 @@ private struct ProviderStatusBadge: View {
         snapshot.claudeQuotaFreshness()
     }
 
-    private var helpText: String {
-        guard freshness != nil, let updatedAt = snapshot.updatedAt else {
-            return "\(snapshot.provider.displayName) status: \(label)"
-        }
-        let limitedText = snapshot.health == .limited
-            ? "Only one Claude quota window is available. "
-            : ""
-        return "\(limitedText)Claude quota captured \(UsageFormatting.age(since: updatedAt)). Send a Claude Code message to obtain fresh quota data."
-    }
-
-    private var accessibilityLabel: String {
-        guard freshness != nil else {
-            return "\(snapshot.provider.displayName) status: \(label)"
-        }
-        return "Claude Code quota capture: \(label)"
-    }
 }
 
 private struct UsageIssueView: View {
